@@ -1,4 +1,0 @@
-flask>=3.0
-flask-sock>=0.7
-pywebview>=5.0
-paramiko>=3.4
