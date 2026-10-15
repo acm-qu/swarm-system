@@ -1,0 +1,12 @@
+{
+  "Clanker1": {
+    "host": "10.20.63.166",
+    "user": "acmpi",
+    "home": "/home/acmpi",
+    "host_key": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC9mdWndrX/etOGhp29qoEVm+g2dJIF77HqsARiiIl8a",
+    "machine_id": "a75a658034214bca9f865dc1904fdf9e",
+    "hostname": "ACMpi1",
+    "added": 1791983897.6775098,
+    "updated": 1791984198.2815127
+  }
+}
