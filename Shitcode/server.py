@@ -1613,8 +1613,6 @@ def api_robot_command(name, cmd):
 
 def add_user(name):
     password = getpass.getpass("Password: ")
-    if len(password) < 8:
-        sys.exit("Use at least 8 characters.")
     if getpass.getpass("Repeat password: ") != password:
         sys.exit("Passwords do not match.")
     users = load_users()
