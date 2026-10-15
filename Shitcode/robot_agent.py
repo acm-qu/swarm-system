@@ -63,20 +63,20 @@ WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"   # fixed value from the WebSoc
 # Remember to remove the ENA/ENB jumpers on the L298N boards.
 
 # Driver 1 - FRONT wheels
-FRONT_IN_A1 = None
-FRONT_IN_A2 = None
-FRONT_EN_A = None
-FRONT_IN_B1 = None
-FRONT_IN_B2 = None
-FRONT_EN_B = None
+FRONT_IN_A1 = 14
+FRONT_IN_A2 = 15
+FRONT_EN_A = 9
+FRONT_IN_B1 = 18
+FRONT_IN_B2 = 23
+FRONT_EN_B = 10
 
 # Driver 2 - REAR wheels
-REAR_IN_A1 = None
-REAR_IN_A2 = None
-REAR_EN_A = None
-REAR_IN_B1 = None
-REAR_IN_B2 = None
-REAR_EN_B = None
+REAR_IN_A1 = 25
+REAR_IN_A2 = 8
+REAR_EN_A = 17
+REAR_IN_B1 = 7
+REAR_IN_B2 = 12
+REAR_EN_B = 27
 
 # If a wheel spins the wrong way, flip its value here.
 # Motors on opposite sides are mirrored, so one side usually needs flipping.
