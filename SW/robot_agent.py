@@ -9,26 +9,35 @@ To run it by hand instead (over SSH), stop the service first:
     sudo systemctl stop swarm-agent
     python3 robot_agent.py
 
-It needs only Python 3.7+ and its standard library, so nothing has to be
-installed on the robot (handy, because a robot in hotspot mode has no internet).
+It needs only Python 3.7+ and its standard library for the hub link, so nothing
+has to be installed for that (handy, because a robot in hotspot mode has no
+internet). The motors also need gpiozero, which comes with Raspberry Pi OS (on a
+Pi 5 it uses python3-lgpio). Fill in the motor pin numbers in the MOTORS section
+below; until you do, the agent still connects but leaves the motors disabled.
 
 It reads config.json next to this file, connects to the hub, sends a heartbeat
-every second, answers ping and stop commands, and reconnects by itself if the
-link drops. If the hub goes silent, or the service is stopped, it stops the robot.
+every second, answers ping, stop and drive commands, and reconnects by itself if
+the link drops. If the hub goes silent, or the service is stopped, it stops the
+robot. While driving, the robot also stops by itself if drive commands stop
+arriving for half a second.
 
-Every second it also writes status.json (no secrets in it), which the status
-screen (status_ui.py) shows on the robot's desktop.
+Several times a second it also writes status.json (no secrets in it), which the
+status window (status_ui.py) shows on the robot's desktop: the robot's name and
+user, its IP address, the hub connection, and the last command from the hub.
 """
 
 import asyncio
 import base64
+import getpass
 import hashlib
 import json
+import math
 import os
 import signal
 import socket
 import struct
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -42,15 +51,231 @@ MAX_MESSAGE = 1 << 20     # refuse messages from the hub bigger than 1 MB
 WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"   # fixed value from the WebSocket standard
 
 
+# ---------------------------------------------------------------------------
+# MOTORS: four mecanum wheels on two L298N drivers
+# ---------------------------------------------------------------------------
+#   Driver 1 -> FRONT wheels: channel A = front-left,  channel B = front-right
+#   Driver 2 -> REAR wheels:  channel A = rear-left,   channel B = rear-right
+#
+# PIN SETUP - fill these in yourself (BCM / GPIO numbers, not physical pin
+# positions). Each channel has:
+#   IN_x1 / IN_x2 = the two direction pins (L298N IN1/IN2 for A, IN3/IN4 for B)
+#   EN_x          = the enable pin (L298N ENA / ENB), used for PWM speed control
+# Remember to remove the ENA/ENB jumpers on the L298N boards.
+
+# Driver 1 - FRONT wheels
+FRONT_IN_A1 = 14
+FRONT_IN_A2 = 15
+FRONT_EN_A = 9
+FRONT_IN_B1 = 18
+FRONT_IN_B2 = 23
+FRONT_EN_B = 10
+
+# Driver 2 - REAR wheels
+REAR_IN_A1 = 25
+REAR_IN_A2 = 8
+REAR_EN_A = 17
+REAR_IN_B1 = 7
+REAR_IN_B2 = 12
+REAR_EN_B = 27
+
+# If a wheel spins the wrong way, flip its value here.
+# Motors on opposite sides are mirrored, so one side usually needs flipping.
+INVERT_FRONT_LEFT = False
+INVERT_FRONT_RIGHT = False
+INVERT_REAR_LEFT = False
+INVERT_REAR_RIGHT = False
+
+DRIVE_TIMEOUT = 0.5   # stop if no drive command arrives for this long (seconds)
+
+try:
+    from gpiozero import Motor
+except ImportError:
+    Motor = None
+
+fl = fr = rl = rr = None    # the four Motor objects; created by setup_motors()
+
+
+def make_motor(in1, in2, enable):
+    # pwm=True lets us set speeds between 0 and 1 using the enable pin.
+    return Motor(forward=in1, backward=in2, enable=enable, pwm=True)
+
+
+def setup_motors():
+    """Create the four motors. If anything is missing, leave them disabled (the agent still runs)."""
+    global fl, fr, rl, rr
+    pins = (FRONT_IN_A1, FRONT_IN_A2, FRONT_EN_A, FRONT_IN_B1, FRONT_IN_B2, FRONT_EN_B,
+            REAR_IN_A1, REAR_IN_A2, REAR_EN_A, REAR_IN_B1, REAR_IN_B2, REAR_EN_B)
+    if any(p is None for p in pins):
+        print("[robot] motor pins aren't filled in (see the MOTORS section of robot_agent.py); "
+              "motors disabled", flush=True)
+        return
+    if Motor is None:
+        print("[robot] gpiozero isn't installed (sudo apt install python3-gpiozero python3-lgpio); "
+              "motors disabled", flush=True)
+        return
+    try:
+        fl = make_motor(FRONT_IN_A1, FRONT_IN_A2, FRONT_EN_A)   # front-left
+        fr = make_motor(FRONT_IN_B1, FRONT_IN_B2, FRONT_EN_B)   # front-right
+        rl = make_motor(REAR_IN_A1, REAR_IN_A2, REAR_EN_A)      # rear-left
+        rr = make_motor(REAR_IN_B1, REAR_IN_B2, REAR_EN_B)      # rear-right
+    except Exception as err:
+        fl = fr = rl = rr = None
+        print("[robot] couldn't set up the motors ({}: {}); motors disabled".format(
+            type(err).__name__, err), flush=True)
+        return
+    print("[robot] motors ready", flush=True)
+
+
+def set_wheel(motor, speed, invert):
+    """Set one wheel. speed goes from -1 (full reverse) to 1 (full forward)."""
+    if invert:
+        speed = -speed
+    motor.value = max(-1.0, min(1.0, speed))
+
+
+def drive(forward=0.0, strafe=0.0, rotate=0.0):
+    """
+    Mix the three mecanum movements into the four wheel speeds.
+      forward: +1 = forward,        -1 = backward
+      strafe:  +1 = slide right,    -1 = slide left
+      rotate:  +1 = turn clockwise, -1 = turn counter-clockwise
+    Values can be combined (e.g. forward + strafe = diagonal movement).
+    """
+    if fl is None:
+        return                                  # motors disabled
+    front_left = forward + strafe + rotate
+    front_right = forward - strafe - rotate
+    rear_left = forward - strafe + rotate
+    rear_right = forward + strafe - rotate
+
+    # If any wheel goes above 1, scale everything down so the direction stays correct.
+    biggest = max(abs(front_left), abs(front_right), abs(rear_left), abs(rear_right), 1.0)
+
+    set_wheel(fl, front_left / biggest, INVERT_FRONT_LEFT)
+    set_wheel(fr, front_right / biggest, INVERT_FRONT_RIGHT)
+    set_wheel(rl, rear_left / biggest, INVERT_REAR_LEFT)
+    set_wheel(rr, rear_right / biggest, INVERT_REAR_RIGHT)
+
+
 def stop_motors(reason):
-    # TODO: replace this print with the real motor stop from Hiwonder's code,
-    # for example setting all four wheel speeds to zero and holding the arm.
+    """Stop all four wheels. Called on a hub stop command, a lost link, and exit."""
     print("[robot] STOP ({})".format(reason), flush=True)
+    for m in (fl, fr, rl, rr):
+        if m is not None:
+            try:
+                m.stop()
+            except Exception:
+                pass
 
 
-# What the status screen shows. Written to status.json every second.
+def handle_drive(msg, state):
+    """Apply a drive command from the hub: forward, strafe and rotate, each from -1 to 1."""
+    try:
+        values = [float(msg.get(k, 0)) for k in ("forward", "strafe", "rotate")]
+    except (TypeError, ValueError):
+        return
+    if not all(math.isfinite(v) for v in values):
+        return
+    drive(*values)
+    set_control("drive", forward=values[0], strafe=values[1], rotate=values[2])
+    # Keep moving only while commands keep arriving; drive_guard stops the robot if they stop.
+    state["drive_until"] = (time.monotonic() + DRIVE_TIMEOUT) if any(values) else 0.0
+
+
+# ---------------------------------------------------------------------------
+# CAMERA: USB camera streamed to the hub as JPEG frames
+# ---------------------------------------------------------------------------
+# Needs OpenCV:  sudo apt install python3-opencv
+# The camera only runs while someone is watching it in the hub (the hub says so in
+# each heartbeat reply), so it costs nothing the rest of the time.
+
+CAMERA_INDEX = 0          # /dev/video0. If it's the wrong one, try 2, 4, ... (see: v4l2-ctl --list-devices)
+CAMERA_WIDTH = 640
+CAMERA_HEIGHT = 480
+CAMERA_FPS = 15           # frames per second sent to the hub
+JPEG_QUALITY = 70         # 1-100; lower = smaller frames
+MAX_BUFFERED = 256 * 1024  # skip a frame if this much is still waiting to be sent (slow Wi-Fi)
+
+try:
+    import cv2
+except ImportError:
+    cv2 = None
+
+
+class Camera:
+    """Grabs frames on a background thread while `want` is True; keeps the latest JPEG."""
+
+    def __init__(self):
+        self.want = False
+        self.frame = None
+        self.frame_id = 0
+        self.error = ""
+        self.thread = None
+
+    def set_wanted(self, want):
+        self.want = bool(want)
+        if self.want and (self.thread is None or not self.thread.is_alive()):
+            self.thread = threading.Thread(target=self._run, daemon=True)
+            self.thread.start()
+
+    def _run(self):
+        if cv2 is None:
+            self.error = "OpenCV isn't installed (sudo apt install python3-opencv)"
+            return
+        while self.want:
+            cap = cv2.VideoCapture(CAMERA_INDEX, cv2.CAP_V4L2)
+            if not cap.isOpened():
+                self.error = "can't open camera {} (is it plugged in?)".format(CAMERA_INDEX)
+                cap.release()
+                time.sleep(2)
+                continue
+            # Most USB cameras give JPEG natively, which is far lighter than raw video.
+            cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            last = 0.0
+            bad = 0
+            while self.want:
+                ok, img = cap.read()
+                if not ok:
+                    bad += 1
+                    if bad > 30:
+                        self.error = "camera stopped giving frames"
+                        break
+                    time.sleep(0.05)
+                    continue
+                bad = 0
+                now = time.monotonic()
+                if now - last < 1.0 / CAMERA_FPS:
+                    continue                      # too soon; drop it
+                last = now
+                ok, jpg = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
+                if ok:
+                    self.frame = jpg.tobytes()
+                    self.frame_id += 1
+                    self.error = ""
+            cap.release()
+            if self.want:
+                time.sleep(2)
+        self.frame = None
+
+
+camera = Camera()
+
+
+def current_user():
+    try:
+        return getpass.getuser()
+    except Exception:
+        return ""
+
+
+# What the status screen shows. Written to status.json several times a second.
 STATUS = {
     "hostname": socket.gethostname(),   # the robot's own name
+    "user": current_user(),             # the Linux user the agent runs as
     "hub_name": "",                     # its name on the hub
     "ips": [],                          # this robot's IP addresses
     "seen_as": "",                      # the address the hub sees it at
@@ -59,6 +284,7 @@ STATUS = {
     "since": time.time(),               # when "connected" last changed
     "error": "",                        # why it isn't connected
     "swarm": [],                        # every robot the hub knows, from the hub
+    "control": {},                      # the last command received from the hub (see set_control)
     "updated": 0,
 }
 
@@ -74,6 +300,11 @@ def describe(err):
     if isinstance(err, OSError) and getattr(err, "errno", None) in (101, 113):
         return "no network path to the hub"
     return str(err) or type(err).__name__
+
+
+def set_control(kind, **values):
+    """Remember the last command received from the hub, for the status window."""
+    STATUS["control"] = dict(values, kind=kind, at=time.time())
 
 
 def set_connected(connected, hub, error=""):
@@ -194,6 +425,16 @@ class WebSocket:
     async def send(self, text):
         await self._send_frame(0x1, text.encode())
 
+    async def send_bytes(self, data):
+        await self._send_frame(0x2, data)
+
+    def backlog(self):
+        """Bytes written but not yet sent (used to skip camera frames on a slow link)."""
+        try:
+            return self.writer.transport.get_write_buffer_size()
+        except Exception:
+            return 0
+
     async def recv(self):
         """Return the next text message. Answers pings; raises LinkClosed when the link ends."""
         parts = []
@@ -265,7 +506,7 @@ async def run_session(cfg, hub, status):
         STATUS["seen_as"] = str(reply.get("seen_as") or "")
         set_connected(True, hub)
         print("[robot] connected to {} as '{}'".format(hub, cfg["name"]), flush=True)
-        state = {"last_rx": time.monotonic()}
+        state = {"last_rx": time.monotonic(), "drive_until": 0.0}
 
         async def heartbeat():
             while True:
@@ -282,14 +523,20 @@ async def run_session(cfg, hub, status):
                     continue
                 kind = msg.get("type") if isinstance(msg, dict) else None
                 if kind == "heartbeat_ack":
+                    camera.set_wanted(msg.get("camera"))
                     swarm = msg.get("swarm")
                     if isinstance(swarm, list):
                         STATUS["swarm"] = [r for r in swarm[:200] if isinstance(r, dict)]
                 elif kind == "ping":
+                    set_control("ping")
                     await ws.send(json.dumps({"type": "pong", "id": msg.get("id")}))
                 elif kind == "stop":
+                    state["drive_until"] = 0.0
+                    set_control("stop")
                     stop_motors("hub command")
                     await ws.send(json.dumps({"type": "stop_ack"}))
+                elif kind == "drive":
+                    handle_drive(msg, state)
 
         async def watchdog():
             while True:
@@ -297,7 +544,33 @@ async def run_session(cfg, hub, status):
                 if time.monotonic() - state["last_rx"] > HUB_SILENCE_LIMIT:
                     raise LinkClosed("hub went silent")
 
-        tasks = [asyncio.ensure_future(job()) for job in (heartbeat, reader, watchdog)]
+        async def drive_guard():
+            # Dead-man switch: the hub sends drive commands about 10 times a second while a
+            # button is held. If they stop arriving, stop the wheels.
+            while True:
+                await asyncio.sleep(0.1)
+                until = state["drive_until"]
+                if until and time.monotonic() > until:
+                    state["drive_until"] = 0.0
+                    stop_motors("no drive command received")
+
+        async def camera_sender():
+            sent_id = 0
+            reported = None
+            while True:
+                await asyncio.sleep(0.03)
+                if camera.error != reported:
+                    reported = camera.error
+                    await ws.send(json.dumps({"type": "camera_status", "error": reported}))
+                frame = camera.frame
+                if not camera.want or frame is None or camera.frame_id == sent_id:
+                    continue
+                if ws.backlog() > MAX_BUFFERED:
+                    continue                      # link is behind; drop this frame
+                sent_id = camera.frame_id
+                await ws.send_bytes(frame)
+
+        tasks = [asyncio.ensure_future(job()) for job in (heartbeat, reader, watchdog, drive_guard, camera_sender)]
         try:
             done, _pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
             for task in done:
@@ -308,6 +581,7 @@ async def run_session(cfg, hub, status):
             stop_motors("link lost: {}".format(err))
             raise
         finally:
+            camera.set_wanted(False)
             for task in tasks:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
@@ -358,11 +632,12 @@ async def status_writer(cfg):
             os.replace(str(tmp), str(STATUS_FILE))
         except OSError:
             pass
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.2)
 
 
 async def main():
     cfg = load_config()
+    setup_motors()
     hubs = cfg["hubs"]        # addresses to try in turn, e.g. the hub's IP and its .local name
     STATUS["hub_name"] = cfg["name"]
     STATUS["hub"] = hubs[0]
