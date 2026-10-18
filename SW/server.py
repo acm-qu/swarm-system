@@ -16,6 +16,7 @@ Usage:
 import getpass
 import json
 import logging
+import math
 import os
 import re
 import secrets
@@ -27,7 +28,7 @@ import threading
 import time
 from pathlib import Path
 
-from flask import Flask, jsonify, redirect, render_template_string, request, session, url_for
+from flask import Flask, Response, jsonify, redirect, render_template_string, request, session, url_for
 from flask_sock import Sock
 from simple_websocket import ConnectionClosed
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -49,6 +50,11 @@ ONLINE_WITHIN = 3.0    # robot counts as connected if heard from this recently (
 SILENCE_LIMIT = 5.0    # hub drops a robot that sends nothing for this long (seconds)
 CONNECT_WAIT = 25      # after installing, wait this long for the robot to connect (seconds)
 REBOOT_WAIT = 180      # after rebooting a robot, wait this long for it to come back (seconds)
+CAMERA_IDLE = 4.0           # robot's camera turns off this long after the last viewer leaves (seconds)
+CAMERA_MAX_FRAME = 2_000_000   # ignore camera frames bigger than this (bytes)
+TERM_TIMEOUT = 30      # a terminal command is stopped after this many seconds
+TERM_MAX_OUTPUT = 100_000   # most output (bytes) returned for one terminal command
+TERM_MARK = "__SWARM_CWD__"  # printed after each command so the hub learns the folder it ended in
 
 NAME_RE = re.compile(r"[A-Za-z0-9_-]{1,32}")
 HOST_RE = re.compile(r"[A-Za-z0-9.:_-]{1,253}")
@@ -196,6 +202,26 @@ PAGE = r"""
     .note.good { color: var(--ok); background: var(--ok-bg); }
     .note.warn { color: var(--warn); background: var(--warn-bg); }
     .note.bad { color: var(--bad); background: var(--bad-bg); }
+    .pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; max-width: 15rem; margin: 1rem auto; }
+    .pad button { padding: .8rem 0; font-size: 1.2rem; touch-action: none; user-select: none; -webkit-user-select: none; }
+    .pad button small { display: block; font-size: .65rem; opacity: .7; }
+    .pad button.on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+    .dialog.cam { max-width: 44rem; }
+    .cam-box { position: relative; background: #000; border-radius: 8px; overflow: hidden; min-height: 12rem; margin-top: .8rem; }
+    .cam-box img { display: block; width: 100%; height: auto; }
+    .cam-box .cam-msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+                        color: #98a2b3; padding: 1rem; text-align: center; pointer-events: none; }
+    .dialog.term { max-width: 46rem; }
+    .term-out { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; height: 45vh; overflow: auto;
+                padding: .6rem .7rem; font: .85rem/1.4 ui-monospace, monospace; }
+    .term-out .cmd { color: var(--accent); margin-top: .5rem; white-space: pre-wrap; word-break: break-all; }
+    .term-out pre { margin: 0; white-space: pre-wrap; word-break: break-all; font: inherit; }
+    .term-out .meta { color: var(--muted); }
+    .term-out .meta.bad { color: var(--bad); }
+    .term-line { display: flex; gap: .5rem; align-items: center; margin-top: .6rem; }
+    .term-line .prompt { max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: .85rem ui-monospace, monospace; }
+    .term-line input { flex: 1; min-width: 0; font: .9rem ui-monospace, monospace; padding: .45rem .6rem;
+                       border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); }
   </style>
 </head>
 <body>
@@ -248,6 +274,56 @@ PAGE = r"""
       <div class="buttons">
         <button type="button" id="dlg-close">Cancel</button>
         <button type="submit" form="dlg-form" class="primary" id="dlg-go">Install</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="drive-overlay" hidden>
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="drive-title">
+      <h2 id="drive-title">Drive</h2>
+      <p class="muted">Hold a button or key to move; let go and the robot stops. Keys: W A S D to move, Q and E to turn, Space to stop.</p>
+      <div class="pad" id="drive-pad">
+        <button type="button" data-key="q">&#10226;<small>Q</small></button>
+        <button type="button" data-key="w">&#9650;<small>W</small></button>
+        <button type="button" data-key="e">&#10227;<small>E</small></button>
+        <button type="button" data-key="a">&#9664;<small>A</small></button>
+        <button type="button" class="danger" id="drive-stop">&#9632;<small>Space</small></button>
+        <button type="button" data-key="d">&#9654;<small>D</small></button>
+        <span></span>
+        <button type="button" data-key="s">&#9660;<small>S</small></button>
+        <span></span>
+      </div>
+      <label>Speed <span class="muted" id="drive-speed-label">40%</span>
+        <input id="drive-speed" type="range" min="10" max="100" value="40"></label>
+      <p class="error" id="drive-error"></p>
+      <div class="buttons"><button type="button" id="drive-close">Close</button></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="cam-overlay" hidden>
+    <div class="dialog cam" role="dialog" aria-modal="true" aria-labelledby="cam-title">
+      <h2 id="cam-title">Camera</h2>
+      <div class="cam-box">
+        <img id="cam-img" alt="Live camera">
+        <div class="cam-msg" id="cam-msg">Waiting for the camera…</div>
+      </div>
+      <div class="buttons"><button type="button" id="cam-close">Close</button></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="term-overlay" hidden>
+    <div class="dialog term" role="dialog" aria-modal="true" aria-labelledby="term-title">
+      <h2 id="term-title">Terminal</h2>
+      <p class="muted">Runs one command at a time on the robot over SSH, as the robot's user. A folder change (cd) is remembered. Programs that need typing (nano, top, sudo asking for a password) won't work, and each command stops after 30 seconds.</p>
+      <div class="term-out" id="term-out"></div>
+      <form class="term-line" id="term-form" autocomplete="off">
+        <span class="muted prompt" id="term-prompt">~ $</span>
+        <input id="term-input" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Command">
+        <button type="submit" class="primary small" id="term-run">Run</button>
+      </form>
+      <div class="buttons">
+        <button type="button" id="term-clear">Clear</button>
+        <button type="button" id="term-close">Close</button>
       </div>
     </div>
   </div>
@@ -323,8 +399,11 @@ PAGE = r"""
         cellTd.appendChild(td);
         const live = r.status !== 'offline';
         button(td, 'Ping', () => post('/api/robots/' + encodeURIComponent(r.name) + '/ping').then(refresh, () => {}), { disabled: !live });
+        button(td, 'Camera', () => openCam(r.name), { disabled: !live });
+        button(td, 'Drive', () => openDrive(r.name), { disabled: !live });
         button(td, 'Stop', () => post('/api/robots/' + encodeURIComponent(r.name) + '/stop').then(refresh, () => {}), { disabled: !live });
         if (r.installed) {
+          button(td, 'Terminal', () => openTerm(r.name), { disabled: !!r.job });
           button(td, 'Update', () => openDialog('update', r.name), { disabled: !!r.job });
           button(td, 'Remove', () => openDialog('remove', r.name), { disabled: !!r.job, danger: true });
         }
@@ -473,6 +552,209 @@ PAGE = r"""
       }).catch(() => { current.timer = setTimeout(pollJob, 1500); });
     }
 
+    // ---- manual drive panel
+    // While a button or key is held, the page sends a drive command about 10 times a second.
+    // The robot stops by itself if they stop arriving, so a closed tab or dropped link is safe.
+
+    // [forward, strafe, rotate] for each key; strafe + is right, rotate + is clockwise
+    const DIRS = { w: [1, 0, 0], s: [-1, 0, 0], a: [0, -1, 0], d: [0, 1, 0], q: [0, 0, -1], e: [0, 0, 1] };
+    const drv = { name: null, held: new Set(), moving: false, timer: null };
+
+    function driveVector() {
+      const speed = $('drive-speed').value / 100;
+      const sum = [0, 0, 0];
+      for (const k of drv.held) DIRS[k].forEach((x, i) => { sum[i] += x; });
+      return sum.map(x => Math.max(-1, Math.min(1, x)) * speed);
+    }
+
+    function sendStop() {
+      drv.moving = false;
+      if (drv.name) post('/api/robots/' + encodeURIComponent(drv.name) + '/stop').catch(() => {});
+    }
+
+    function driveTick() {
+      if (!drv.name) return;
+      const v = driveVector();
+      if (v.every(x => x === 0)) {
+        if (drv.moving) sendStop();
+        return;
+      }
+      drv.moving = true;
+      post('/api/robots/' + encodeURIComponent(drv.name) + '/drive', { forward: v[0], strafe: v[1], rotate: v[2] })
+        .then(() => { $('drive-error').textContent = ''; })
+        .catch(err => { $('drive-error').textContent = err.message; });
+    }
+
+    function paintPad() {
+      document.querySelectorAll('#drive-pad [data-key]').forEach(b => b.classList.toggle('on', drv.held.has(b.dataset.key)));
+    }
+
+    function release() { drv.held.clear(); paintPad(); }
+
+    function openDrive(name) {
+      drv.name = name;
+      drv.moving = false;
+      release();
+      $('drive-title').textContent = 'Drive ' + name;
+      $('drive-error').textContent = '';
+      $('drive-overlay').hidden = false;
+      clearInterval(drv.timer);
+      drv.timer = setInterval(driveTick, 100);
+    }
+
+    function closeDrive() {
+      release();
+      sendStop();
+      clearInterval(drv.timer);
+      drv.timer = null;
+      drv.name = null;
+      $('drive-overlay').hidden = true;
+    }
+
+    document.querySelectorAll('#drive-pad [data-key]').forEach(b => {
+      const key = b.dataset.key;
+      b.onpointerdown = e => { e.preventDefault(); drv.held.add(key); paintPad(); };
+      for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) {
+        b['on' + ev] = () => { drv.held.delete(key); paintPad(); };
+      }
+    });
+    $('drive-stop').onclick = () => { release(); sendStop(); };
+    $('drive-close').onclick = closeDrive;
+    $('drive-speed').oninput = () => { $('drive-speed-label').textContent = $('drive-speed').value + '%'; };
+    document.addEventListener('keydown', e => {
+      if ($('drive-overlay').hidden) return;
+      const k = e.key.toLowerCase();
+      if (e.key === 'Escape') { closeDrive(); return; }
+      if (k === ' ') { e.preventDefault(); release(); sendStop(); return; }
+      if (DIRS[k]) { e.preventDefault(); if (!e.repeat) { drv.held.add(k); paintPad(); } }
+    });
+    document.addEventListener('keyup', e => { drv.held.delete(e.key.toLowerCase()); paintPad(); });
+    window.addEventListener('blur', () => { if (drv.name) release(); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden && drv.name) release(); });
+
+    // ---- camera: the hub serves the robot's frames as an MJPEG stream the <img> shows directly.
+    // Having the stream open is what keeps the robot's camera on; closing it lets the camera turn off.
+
+    const cam = { name: null, timer: null };
+
+    function camStart() {
+      const img = $('cam-img');
+      $('cam-msg').hidden = false;
+      $('cam-msg').textContent = 'Waiting for the camera…';
+      img.onload = () => { $('cam-msg').hidden = true; };
+      img.onerror = () => {                    // robot offline or the stream ended: try again shortly
+        $('cam-msg').hidden = false;
+        $('cam-msg').textContent = 'No picture yet. Retrying…';
+        clearTimeout(cam.timer);
+        if (cam.name) cam.timer = setTimeout(camStart, 2000);
+      };
+      img.src = '/api/robots/' + encodeURIComponent(cam.name) + '/camera?t=' + Date.now();
+    }
+
+    function openCam(name) {
+      cam.name = name;
+      $('cam-title').textContent = 'Camera: ' + name;
+      $('cam-overlay').hidden = false;
+      camStart();
+    }
+
+    function closeCam() {
+      clearTimeout(cam.timer);
+      cam.name = null;
+      $('cam-img').removeAttribute('src');     // drops the connection, so the robot's camera can stop
+      $('cam-overlay').hidden = true;
+    }
+
+    $('cam-close').onclick = closeCam;
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('cam-overlay').hidden) closeCam(); });
+
+    // ---- terminal: one command at a time over SSH; the server tells us which folder it ended in
+
+    const term = { name: null, cwd: '', busy: false, history: [], pos: 0 };
+
+    function termAdd(command, output, meta, bad) {
+      const out = $('term-out');
+      const line = document.createElement('div');
+      line.className = 'cmd';
+      line.textContent = command;
+      out.appendChild(line);
+      if (output) {
+        const pre = document.createElement('pre');
+        pre.textContent = output;             // text only, so robot output can't inject markup
+        out.appendChild(pre);
+      }
+      if (meta) {
+        const m = document.createElement('div');
+        m.className = 'meta' + (bad ? ' bad' : '');
+        m.textContent = meta;
+        out.appendChild(m);
+      }
+      out.scrollTop = out.scrollHeight;
+    }
+
+    function setPrompt() { $('term-prompt').textContent = (term.cwd || '~') + ' $'; }
+
+    function openTerm(name) {
+      if (drv.name) closeDrive();
+      term.name = name;
+      term.cwd = '';
+      term.busy = false;
+      setPrompt();
+      $('term-title').textContent = 'Terminal: ' + name;
+      $('term-out').replaceChildren();
+      $('term-input').value = '';
+      $('term-overlay').hidden = false;
+      $('term-input').focus();
+    }
+
+    function closeTerm() {
+      term.name = null;
+      $('term-overlay').hidden = true;
+    }
+
+    $('term-form').onsubmit = event => {
+      event.preventDefault();
+      const command = $('term-input').value.trim();
+      if (!command || term.busy || !term.name) return;
+      const name = term.name;
+      const prompt = $('term-prompt').textContent;
+      term.history.push(command);
+      if (term.history.length > 200) term.history.shift();
+      term.pos = term.history.length;
+      term.busy = true;
+      $('term-run').disabled = true;
+      $('term-run').textContent = 'Running…';
+      $('term-input').value = '';
+      post('/api/robots/' + encodeURIComponent(name) + '/exec', { command: command, cwd: term.cwd }).then(out => {
+        if (term.name !== name) return;       // the panel was closed or switched meanwhile
+        if (out.cwd) term.cwd = out.cwd;
+        setPrompt();
+        let meta = '';
+        if (out.timed_out) meta = 'stopped: it took longer than ' + out.limit + ' seconds';
+        else if (out.code) meta = 'exit code ' + out.code;
+        if (out.truncated) meta += (meta ? ' · ' : '') + 'output cut short';
+        termAdd(prompt + ' ' + command, out.output, meta, !!out.code || !!out.timed_out);
+      }, err => {
+        if (term.name === name) termAdd(prompt + ' ' + command, '', err.message, true);
+      }).finally(() => {
+        term.busy = false;
+        $('term-run').disabled = false;
+        $('term-run').textContent = 'Run';
+        if (term.name) $('term-input').focus();
+      });
+    };
+
+    $('term-input').onkeydown = e => {         // Up / Down walk through earlier commands
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      if (!term.history.length) return;
+      e.preventDefault();
+      term.pos = e.key === 'ArrowUp' ? Math.max(0, term.pos - 1) : Math.min(term.history.length, term.pos + 1);
+      e.target.value = term.history[term.pos] || '';
+    };
+    $('term-clear').onclick = () => $('term-out').replaceChildren();
+    $('term-close').onclick = closeTerm;
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('term-overlay').hidden) closeTerm(); });
+
     $('add').onclick = () => openDialog('add');
     $('dlg-close').onclick = closeDialog;
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('overlay').hidden) closeDialog(); });
@@ -614,6 +896,7 @@ def robot_socket(ws):
             "hostname": re.sub(r"[^A-Za-z0-9._-]", "", str(hello.get("hostname", "")))[:64],
             "connected_at": now, "last_seen": now, "latency_ms": None,
             "ping_sent": {}, "event": "connected",
+            "cam_wanted": 0.0, "frame": None, "frame_id": 0, "camera_error": "",
         }
         with robots_lock:
             old = robots.get(name)
@@ -631,6 +914,12 @@ def robot_socket(ws):
             if raw is None:
                 rec["event"] = "went silent"
                 break
+            if isinstance(raw, bytes):            # a binary message is one camera frame (JPEG)
+                rec["last_seen"] = time.time()
+                if len(raw) <= CAMERA_MAX_FRAME:
+                    rec["frame"] = raw
+                    rec["frame_id"] += 1
+                continue
             try:
                 msg = json.loads(raw)
             except ValueError:
@@ -640,8 +929,14 @@ def robot_socket(ws):
             rec["last_seen"] = time.time()
             kind = msg.get("type")
             if kind == "heartbeat":
-                # The ack carries the swarm list, which the robot's status screen shows.
-                robot_send(rec, {"type": "heartbeat_ack", "swarm": swarm_for_robots()})
+                # The ack carries the swarm list, which the robot's status screen shows,
+                # and tells the robot whether anyone is watching its camera.
+                watching = time.time() - rec["cam_wanted"] < CAMERA_IDLE
+                robot_send(rec, {"type": "heartbeat_ack", "swarm": swarm_for_robots(), "camera": watching})
+            elif kind == "camera_status":
+                rec["camera_error"] = str(msg.get("error", ""))[:200]
+                if rec["camera_error"]:
+                    rec["event"] = "camera: " + rec["camera_error"]
             elif kind == "pong":
                 sent = rec["ping_sent"].pop(msg.get("id"), None)
                 if sent is not None:
@@ -749,6 +1044,65 @@ def run(client, command, stdin_data=None, timeout=60):
     out = stdout.read().decode(errors="replace")
     err = stderr.read().decode(errors="replace")
     return stdout.channel.recv_exit_status(), out, err
+
+
+def run_capped(client, command, timeout, cap):
+    """Run a command, collecting stdout and stderr together. Stops waiting after `timeout`
+    seconds or `cap` bytes. Returns (exit code or None, output, timed_out, truncated)."""
+    chan = client.get_transport().open_session()
+    chan.set_combine_stderr(True)
+    chan.exec_command(command)
+    chan.shutdown_write()                   # nothing to type: commands that wait for input just end
+    out = bytearray()
+    deadline = time.time() + timeout
+    timed_out = truncated = False
+    try:
+        while True:
+            if chan.recv_ready():
+                data = chan.recv(65536)
+                room = cap - len(out)
+                out += data[:room]
+                if len(data) > room:
+                    truncated = True
+                    break
+                continue
+            if chan.exit_status_ready() or chan.closed:
+                break
+            if time.time() > deadline:
+                timed_out = True
+                break
+            time.sleep(0.05)
+        code = None if (timed_out or truncated) else chan.recv_exit_status()
+    finally:
+        chan.close()
+    return code, out.decode(errors="replace"), timed_out, truncated
+
+
+def run_terminal(entry, command, cwd):
+    """Run one terminal command on an installed robot over SSH.
+
+    Each command is its own login, so the hub passes the current folder in (cwd) and reads
+    the folder the command ended in, which makes `cd` stick between commands."""
+    client, _ = ssh_connect(entry["host"], entry["user"], None, entry.get("host_key"))
+    try:
+        script = (f"cd {shlex.quote(cwd)} 2>/dev/null || cd ~\n" if cwd else "") + command + (
+            f"\n__rc=$?\necho\necho {TERM_MARK}$(pwd)\nexit $__rc")
+        remote = f"timeout -k 2 {TERM_TIMEOUT} bash -c {shlex.quote(script)}"
+        code, text, timed_out, truncated = run_capped(client, remote, TERM_TIMEOUT + 5, TERM_MAX_OUTPUT)
+    except Exception as err:
+        raise DeployError(f"Running the command failed: {err}")
+    finally:
+        client.close()
+    timed_out = timed_out or code in (124, 137)
+    new_cwd = cwd
+    at = text.rfind(TERM_MARK)
+    if at != -1:
+        lines = text[at + len(TERM_MARK):].splitlines()
+        if lines:
+            new_cwd = lines[0].strip() or cwd
+        text = text[:at].rstrip("\n")       # also drops the blank line the marker adds
+    return {"output": text, "code": None if timed_out else code, "cwd": new_cwd,
+            "timed_out": timed_out, "truncated": truncated, "limit": TERM_TIMEOUT}
 
 
 def run_as_root(client, command, password):
@@ -1249,6 +1603,39 @@ def api_job(job_id):
         return jsonify(out)
 
 
+@app.get("/api/robots/<name>/camera")
+def api_camera(name):
+    """Live camera as an MJPEG stream (an <img> tag can show it directly).
+    Opening this is what tells the robot to start its camera."""
+    bad = api_guard()
+    if bad:
+        return bad
+    with robots_lock:
+        rec = robots.get(name)
+    if rec is None or not rec["online"]:
+        return jsonify(error="robot is offline"), 409
+
+    def frames():
+        last_id = None
+        idle_since = time.time()
+        while rec["online"]:
+            rec["cam_wanted"] = time.time()
+            frame, frame_id = rec["frame"], rec["frame_id"]
+            if frame is not None and frame_id != last_id:
+                last_id = frame_id
+                idle_since = time.time()
+                yield (b"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: "
+                       + str(len(frame)).encode() + b"\r\n\r\n" + frame + b"\r\n")
+            else:
+                time.sleep(0.03)
+                if time.time() - idle_since > 15:      # nothing for a while: let the page retry
+                    return
+        rec["cam_wanted"] = 0.0
+
+    return Response(frames(), mimetype="multipart/x-mixed-replace; boundary=frame",
+                    headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
+
+
 @app.post("/api/robots/<name>/<cmd>")
 def api_robot_command(name, cmd):
     bad = api_guard()
@@ -1269,12 +1656,48 @@ def api_robot_command(name, cmd):
         if job is None:
             return jsonify(error="Something is already running for this robot. Wait for it to finish."), 409
         return jsonify(job=job["id"])
-    if cmd not in ("ping", "stop"):
+    if cmd == "exec":
+        # Terminal: run one command on the robot over SSH (works even if its agent is offline).
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            data = {}
+        command, cwd = data.get("command"), data.get("cwd") or ""
+        if not isinstance(command, str) or not command.strip():
+            return jsonify(error="Type a command."), 400
+        if len(command) > 4000 or "\0" in command:
+            return jsonify(error="That command is too long."), 400
+        if not isinstance(cwd, str) or len(cwd) > 500 or "\0" in cwd:
+            cwd = ""
+        with registry_lock:
+            entry = registry.get(name)
+        if entry is None:
+            return jsonify(error="This robot wasn't installed by the hub, so the hub can't log in to it."), 404
+        try:
+            return jsonify(run_terminal(entry, command, cwd))
+        except DeployError as err:
+            return jsonify(error=str(err)), 502
+    if cmd not in ("ping", "stop", "drive"):
         return jsonify(error="unknown command"), 404
     with robots_lock:
         rec = robots.get(name)
     if rec is None or not rec["online"]:
         return jsonify(error="robot is offline"), 409
+    if cmd == "drive":
+        # Manual control: forward, strafe and rotate, each from -1 to 1. The page repeats this
+        # about 10 times a second while a button is held; the robot stops if it stops arriving.
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            data = {}
+        try:
+            values = [float(data.get(k, 0)) for k in ("forward", "strafe", "rotate")]
+        except (TypeError, ValueError):
+            return jsonify(error="forward, strafe and rotate must be numbers from -1 to 1"), 400
+        if not all(math.isfinite(v) for v in values):
+            return jsonify(error="forward, strafe and rotate must be numbers from -1 to 1"), 400
+        forward, strafe, rotate = (max(-1.0, min(1.0, v)) for v in values)
+        ok = robot_send(rec, {"type": "drive", "forward": forward, "strafe": strafe, "rotate": rotate})
+        rec["event"] = "driving" if any((forward, strafe, rotate)) else "drive stopped"
+        return jsonify(ok=ok)
     if cmd == "ping":
         ping_id = secrets.randbelow(10 ** 9)
         if len(rec["ping_sent"]) > 20:
@@ -1291,8 +1714,6 @@ def api_robot_command(name, cmd):
 
 def add_user(name):
     password = getpass.getpass("Password: ")
-    if len(password) < 8:
-        sys.exit("Use at least 8 characters.")
     if getpass.getpass("Repeat password: ") != password:
         sys.exit("Passwords do not match.")
     users = load_users()
