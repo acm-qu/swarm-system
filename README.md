@@ -32,7 +32,7 @@ The phases for the current scope of the project and how to achieve it, each phas
 This phase aims to get a singular robot working and controllable through software 
 
 - Optain one of the robots ✅
-- control it manually
+- control it manually ✅
 - make it able to identify its location (relative to some stickers) + gyro
 - Control it's movement by defining target cords and angles
 
