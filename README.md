@@ -9,6 +9,10 @@ The perfect final project is a swarm of different robot types that take a job, w
 3. Many jobs. A job can be a predetermined recipe, or a custom one that an AI planner puts together for the situation.
 4. Many robot types, chosen per job. The fleet mixes types, for example a robot with a carrying hand and another with a flat bed for carrying things. For each job the system checks which types are available, calls the ones it needs, and decides the best way to do the job with them.
 
+An idea/approximation of the interface:
+
+<img width="1417" height="890" alt="image" src="https://github.com/user-attachments/assets/085f405f-e5d9-4085-943f-fd3051781d3c" />
+
 # Current scope: 
 
 This is the simpler version we are actually building first:
