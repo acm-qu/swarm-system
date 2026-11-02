@@ -20,7 +20,7 @@ every second, answers ping, stop and drive commands, and reconnects by itself if
 the link drops. If the hub goes silent, or the service is stopped, it stops the
 robot. While driving, the robot also stops by itself if drive commands stop
 arriving for half a second.
-
+printwofniwfnou w
 Several times a second it also writes status.json (no secrets in it), which the
 status window (status_ui.py) shows on the robot's desktop: the robot's name and
 user, its IP address, the hub connection, and the last command from the hub.
