@@ -14,11 +14,13 @@ A swarm of Raspberry Pi robots (rewired Hiwonder MasterPi chassis) controlled by
 
 ## First-time setup
 
+The team uses the launchers in the repo root, not a virtual environment. They find Python 3.9+ even when it
+isn't on PATH and install packages with `pip --user`:
 ```
-pip install -r hub/requirements.txt        # Python 3.10+ on the PC
-python -m hub adduser <name>               # creates data/users.json
-python -m hub --headless                   # serves http://<your-ip>:8000
+.\swarm setup            # Windows (swarm.cmd -> scripts/swarm.ps1); Mac/Linux: ./swarm.sh setup
+.\swarm                  # start the hub; any other args go to `python -m hub` (adduser, rotate, --headless)
 ```
+Don't create or commit a `.venv`. Add new hub packages to `hub/requirements.txt` so `setup` picks them up.
 On Windows, allow Python through Windows Firewall (Private network) or robots can't connect back.
 Robot packages (`python3-gpiozero`, `python3-smbus`, `python3-opencv`, ...) are listed in
 `robot/requirements.txt` and installed with apt on the Pi.

@@ -114,11 +114,17 @@ data/                YOUR hub's secrets and robot list. Gitignored, never commit
 
 # Getting started (hub on your PC)
 
-```
-pip install -r hub/requirements.txt
-python -m hub adduser <your-name>     # create your login
-python -m hub                         # app window (or: python -m hub --headless, then open the URL)
-```
+You only need Python 3.9+ ([python.org](https://www.python.org/downloads/)). It doesn't have to be on PATH,
+and you don't need a virtual environment. From the repo folder:
+
+| | Windows (PowerShell or cmd) | Mac / Linux |
+|---|---|---|
+| Once: install packages and create your login | `.\swarm setup` | `./swarm.sh setup` |
+| Start the hub (app window) | `.\swarm` | `./swarm.sh` |
+| Start without a window, then open the printed URL | `.\swarm --headless` | `./swarm.sh --headless` |
+| Other commands | `.\swarm adduser <name>`, `.\swarm rotate` | `./swarm.sh adduser <name>`, ... |
+
+If someone adds a package to `hub/requirements.txt`, everyone runs `setup` again after `git pull`.
 
 Then press **Add robot** and give it the robot's IP, user and password. The hub installs everything on the
 robot over SSH. Robot-side packages are listed in `robot/requirements.txt`.
