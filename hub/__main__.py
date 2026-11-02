@@ -12,6 +12,7 @@ Usage (from the repository folder):
     python -m hub rotate           # replace the cookie key, robot token and SSH key
     python -m hub                  # open the app in a window and serve it on port 8000
     python -m hub --headless       # serve only, no window (open the printed URL in a browser)
+    python -m hub --port 8001      # use another port if 8000 is taken (also works with --headless)
 """
 
 import getpass
@@ -69,9 +70,23 @@ def wait_for_server(timeout=10):
     return False
 
 
+def port_in_use(port):
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=0.5):
+            return True
+    except OSError:
+        return False
+
+
 def serve():
     if not storage.load_users():
         sys.exit("No users yet. Create one first:  python -m hub adduser <name>")
+    if port_in_use(config.PORT):
+        # Otherwise the window would quietly show whatever other app owns the port.
+        sys.exit(f"Port {config.PORT} is already used by another program (maybe another project's server, or a "
+                 f"second hub). Stop it, or start the hub on another port:  --port 8001\n"
+                 f"Robots already installed look for the hub on the port it had when they were added; "
+                 f"press Update on each to point them at the new one.")
     for filename in config.ROBOT_FILES:
         if not (config.ROBOT_DIR / filename).exists():
             print(f"Warning: robot/{filename} is missing, so Add robot won't work.")
@@ -99,7 +114,14 @@ def serve():
 
 
 def main(argv=None):
-    argv = sys.argv[1:] if argv is None else argv
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if "--port" in argv:
+        at = argv.index("--port")
+        try:
+            config.PORT = int(argv[at + 1])
+        except (IndexError, ValueError):
+            sys.exit("--port needs a number, e.g. --port 8001")
+        del argv[at:at + 2]
     if len(argv) == 2 and argv[0] == "adduser":
         add_user(argv[1])
     elif argv == ["token"]:
