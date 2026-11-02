@@ -40,6 +40,7 @@ TOKEN_FILE = BASE / "robot_token.txt"   # shared secret that robots must send
 REGISTRY_FILE = BASE / "robots.json"    # robots this hub has installed (no passwords)
 HUB_KEY_FILE = BASE / "hub_ssh_key"     # the hub's SSH key, added to each robot it installs
 AGENT_FILE = BASE / "robot_agent.py"    # the program copied onto each robot
+MOVEMENT_FILE = BASE / "robot_movement.py"   # wheels and arm code, copied next to the agent
 STATUS_UI_FILE = BASE / "status_ui.py"  # the status screen copied onto each robot
 PORT = int(os.environ.get("PORT", "8000"))
 
@@ -57,6 +58,7 @@ TERM_MAX_OUTPUT = 100_000   # most output (bytes) returned for one terminal comm
 TERM_MARK = "__SWARM_CWD__"  # printed after each command so the hub learns the folder it ended in
 
 NAME_RE = re.compile(r"[A-Za-z0-9_-]{1,32}")
+JOINT_RE = re.compile(r"[a-z_]{1,16}")   # arm joint names, as in robot_movement.py
 HOST_RE = re.compile(r"[A-Za-z0-9.:_-]{1,253}")
 USER_RE = re.compile(r"[A-Za-z0-9._-]{1,32}")
 PATH_RE = re.compile(r"/[A-Za-z0-9._/-]*")
@@ -300,6 +302,20 @@ PAGE = r"""
     </div>
   </div>
 
+  <div class="overlay" id="arm-overlay" hidden>
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="arm-title">
+      <h2 id="arm-title">Arm</h2>
+      <p class="muted">Each slider is a servo pulse width in microseconds. Nothing is sent until you move a slider. A joint's first move jumps straight to the slider, so start close to where it really is; after that it moves smoothly. Joint names and channel order are placeholders until you map your arm in robot_movement.py, and the robot clips every value to that joint's limits.</p>
+      <div id="arm-sliders"></div>
+      <p class="error" id="arm-error"></p>
+      <div class="buttons">
+        <button type="button" id="arm-stop">Stop</button>
+        <button type="button" class="danger" id="arm-release">Release (go limp)</button>
+        <button type="button" id="arm-close">Close</button>
+      </div>
+    </div>
+  </div>
+
   <div class="overlay" id="cam-overlay" hidden>
     <div class="dialog cam" role="dialog" aria-modal="true" aria-labelledby="cam-title">
       <h2 id="cam-title">Camera</h2>
@@ -401,6 +417,7 @@ PAGE = r"""
         button(td, 'Ping', () => post('/api/robots/' + encodeURIComponent(r.name) + '/ping').then(refresh, () => {}), { disabled: !live });
         button(td, 'Camera', () => openCam(r.name), { disabled: !live });
         button(td, 'Drive', () => openDrive(r.name), { disabled: !live });
+        button(td, 'Arm', () => openArm(r.name), { disabled: !live });
         button(td, 'Stop', () => post('/api/robots/' + encodeURIComponent(r.name) + '/stop').then(refresh, () => {}), { disabled: !live });
         if (r.installed) {
           button(td, 'Terminal', () => openTerm(r.name), { disabled: !!r.job });
@@ -430,7 +447,7 @@ PAGE = r"""
       },
       update: {
         title: 'Update ',
-        intro: 'Copies the current robot_agent.py and connection settings to the robot and restarts it.',
+        intro: 'Copies the current robot_agent.py, robot_movement.py and connection settings to the robot and restarts it.',
         hint: 'Usually not needed. Fill it in only if the robot asks for it.',
         go: 'Update',
       },
@@ -631,6 +648,70 @@ PAGE = r"""
     document.addEventListener('keyup', e => { drv.held.delete(e.key.toLowerCase()); paintPad(); });
     window.addEventListener('blur', () => { if (drv.name) release(); });
     document.addEventListener('visibilitychange', () => { if (document.hidden && drv.name) release(); });
+
+    // ---- arm panel: one slider per joint; each value is a servo pulse width in microseconds.
+    // The names must match ARM_JOINTS in robot_movement.py (the robot ignores names it doesn't know).
+
+    const ARM_JOINTS = ['base', 'shoulder', 'elbow', 'wrist', 'gripper'];
+    const arm = { name: null, timer: null, pending: {} };
+
+    function armSend() {
+      arm.timer = null;
+      const targets = arm.pending;
+      arm.pending = {};
+      if (!arm.name || !Object.keys(targets).length) return;
+      post('/api/robots/' + encodeURIComponent(arm.name) + '/arm', { targets: targets })
+        .then(() => { $('arm-error').textContent = ''; })
+        .catch(err => { $('arm-error').textContent = err.message; });
+    }
+
+    function armQueue(joint, value) {            // at most ~12 messages a second while a slider is dragged
+      arm.pending[joint] = value;
+      if (!arm.timer) arm.timer = setTimeout(armSend, 80);
+    }
+
+    function buildArm() {
+      const box = $('arm-sliders');
+      box.replaceChildren();
+      for (const joint of ARM_JOINTS) {
+        const label = document.createElement('label');
+        const name = document.createElement('span');
+        name.textContent = joint + ' ';
+        const shown = document.createElement('span');
+        shown.className = 'muted';
+        shown.textContent = '1500 \u00b5s';
+        const input = document.createElement('input');
+        input.type = 'range';
+        input.min = 500; input.max = 2500; input.step = 10; input.value = 1500;
+        input.oninput = () => { shown.textContent = input.value + ' \u00b5s'; armQueue(joint, Number(input.value)); };
+        label.append(name, shown, input);
+        box.appendChild(label);
+      }
+    }
+
+    function openArm(name) {
+      arm.name = name;
+      arm.pending = {};
+      $('arm-title').textContent = 'Arm: ' + name;
+      $('arm-error').textContent = '';
+      buildArm();                                 // sliders start at 1500, but nothing is sent yet
+      $('arm-overlay').hidden = false;
+    }
+
+    function closeArm() {
+      clearTimeout(arm.timer);
+      arm.timer = null;
+      arm.pending = {};
+      arm.name = null;
+      $('arm-overlay').hidden = true;
+    }
+
+    $('arm-stop').onclick = () => { if (arm.name) post('/api/robots/' + encodeURIComponent(arm.name) + '/stop').catch(() => {}); };
+    $('arm-release').onclick = () => {
+      if (arm.name) post('/api/robots/' + encodeURIComponent(arm.name) + '/arm_release').catch(err => { $('arm-error').textContent = err.message; });
+    };
+    $('arm-close').onclick = closeArm;
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('arm-overlay').hidden) closeArm(); });
 
     // ---- camera: the hub serves the robot's frames as an MJPEG stream the <img> shows directly.
     // Having the stream open is what keeps the robot's camera on; closing it lets the camera turn off.
@@ -1257,6 +1338,8 @@ def do_install(job, host, user, password, wanted_name=None, existing=None, reboo
     """Install the agent on a robot (Add), or re-install it (Update); optionally reboot it after."""
     if not AGENT_FILE.exists():
         raise DeployError(f"{AGENT_FILE.name} is missing. Put it in the same folder as server.py.")
+    if not MOVEMENT_FILE.exists():
+        raise DeployError(f"{MOVEMENT_FILE.name} is missing. Put it in the same folder as server.py.")
     _, public_key = hub_key()
     step(job, f"Connecting to {user}@{host}")
     client, host_key = ssh_connect(host, user, password, existing and existing.get("host_key"))
@@ -1289,7 +1372,7 @@ def do_install(job, host, user, password, wanted_name=None, existing=None, reboo
             info(job, f"Couldn't add the key ({err.strip() or 'unknown error'}); updates will need the password.")
 
         screen = STATUS_UI_FILE.exists() and facts.get("tk") == "yes" and facts.get("desktop") == "yes"
-        step(job, f"Copying the agent{' and status screen' if screen else ''} to {folder}")
+        step(job, f"Copying the agent, movement code{' and status screen' if screen else ''} to {folder}")
         addrs = hub_addresses(client)
         config = {"hub": addrs, "name": name, "token": ROBOT_TOKEN, "robot_type": "masterpi"}
         if screen:
@@ -1301,6 +1384,7 @@ def do_install(job, host, user, password, wanted_name=None, existing=None, reboo
             except IOError:
                 pass                                      # already there
             sftp.put(str(AGENT_FILE), f"{folder}/robot_agent.py")
+            sftp.put(str(MOVEMENT_FILE), f"{folder}/robot_movement.py")
             with sftp.open(f"{folder}/config.json", "w") as f:
                 f.chmod(0o600)                            # private before the token goes in
                 f.write(json.dumps(config, indent=2))
@@ -1676,7 +1760,7 @@ def api_robot_command(name, cmd):
             return jsonify(run_terminal(entry, command, cwd))
         except DeployError as err:
             return jsonify(error=str(err)), 502
-    if cmd not in ("ping", "stop", "drive"):
+    if cmd not in ("ping", "stop", "drive", "arm", "arm_release"):
         return jsonify(error="unknown command"), 404
     with robots_lock:
         rec = robots.get(name)
@@ -1697,6 +1781,29 @@ def api_robot_command(name, cmd):
         forward, strafe, rotate = (max(-1.0, min(1.0, v)) for v in values)
         ok = robot_send(rec, {"type": "drive", "forward": forward, "strafe": strafe, "rotate": rotate})
         rec["event"] = "driving" if any((forward, strafe, rotate)) else "drive stopped"
+        return jsonify(ok=ok)
+    if cmd == "arm":
+        # Arm: servo pulse widths in microseconds per joint, e.g. {"targets": {"base": 1500}}.
+        # The robot clips each one to that joint's limits in robot_movement.py.
+        data = request.get_json(silent=True)
+        targets = data.get("targets") if isinstance(data, dict) else None
+        if not isinstance(targets, dict) or not targets or len(targets) > 16:
+            return jsonify(error="targets must name the joints to move, e.g. {\"base\": 1500}"), 400
+        clean = {}
+        for joint, value in targets.items():
+            try:
+                value = float(value)
+            except (TypeError, ValueError):
+                return jsonify(error="arm values must be numbers (pulse width in microseconds)"), 400
+            if not JOINT_RE.fullmatch(str(joint)) or not math.isfinite(value) or not 400 <= value <= 2600:
+                return jsonify(error="bad joint name or a pulse width outside 400-2600 microseconds"), 400
+            clean[joint] = value
+        ok = robot_send(rec, {"type": "arm", "targets": clean})
+        rec["event"] = "arm moved"
+        return jsonify(ok=ok)
+    if cmd == "arm_release":
+        ok = robot_send(rec, {"type": "arm_release"})
+        rec["event"] = "arm released"
         return jsonify(ok=ok)
     if cmd == "ping":
         ping_id = secrets.randbelow(10 ** 9)
@@ -1757,8 +1864,9 @@ if __name__ == "__main__":
         sys.exit()
     if not load_users():
         sys.exit("No users yet. Create one first:  python server.py adduser <name>")
-    if not AGENT_FILE.exists():
-        print(f"Warning: {AGENT_FILE.name} is missing from this folder, so Add robot won't work.")
+    for needed in (AGENT_FILE, MOVEMENT_FILE):
+        if not needed.exists():
+            print(f"Warning: {needed.name} is missing from this folder, so Add robot won't work.")
     print(f"Web page:  http://{lan_ip()}:{PORT}  (any device on your network)")
     if "--headless" in sys.argv:
         run_server()          # server only, no window

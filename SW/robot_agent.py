@@ -11,14 +11,14 @@ To run it by hand instead (over SSH), stop the service first:
 
 It needs only Python 3.7+ and its standard library for the hub link, so nothing
 has to be installed for that (handy, because a robot in hotspot mode has no
-internet). The motors also need gpiozero, which comes with Raspberry Pi OS (on a
-Pi 5 it uses python3-lgpio). Fill in the motor pin numbers in the MOTORS section
-below; until you do, the agent still connects but leaves the motors disabled.
+internet). The wheels and the arm live in robot_movement.py, which the hub copies
+alongside this file; the top of that file says what each needs installed. If one
+isn't set up the agent still connects and just leaves it disabled.
 
 It reads config.json next to this file, connects to the hub, sends a heartbeat
-every second, answers ping, stop and drive commands, and reconnects by itself if
+every second, answers ping, stop, drive, arm and arm_release commands, and reconnects by itself if
 the link drops. If the hub goes silent, or the service is stopped, it stops the
-robot. While driving, the robot also stops by itself if drive commands stop
+wheels and the arm holds where it is. While driving, the robot also stops by itself if drive commands stop
 arriving for half a second.
 
 Several times a second it also writes status.json (no secrets in it), which the
@@ -52,121 +52,22 @@ WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"   # fixed value from the WebSoc
 
 
 # ---------------------------------------------------------------------------
-# MOTORS: four mecanum wheels on two L298N drivers
+# MOVEMENT: the wheels and the arm are in robot_movement.py (pins, servo
+# channels and limits are set there)
 # ---------------------------------------------------------------------------
-#   Driver 1 -> FRONT wheels: channel A = front-left,  channel B = front-right
-#   Driver 2 -> REAR wheels:  channel A = rear-left,   channel B = rear-right
-#
-# PIN SETUP - fill these in yourself (BCM / GPIO numbers, not physical pin
-# positions). Each channel has:
-#   IN_x1 / IN_x2 = the two direction pins (L298N IN1/IN2 for A, IN3/IN4 for B)
-#   EN_x          = the enable pin (L298N ENA / ENB), used for PWM speed control
-# Remember to remove the ENA/ENB jumpers on the L298N boards.
 
-# Driver 1 - FRONT wheels
-FRONT_IN_A1 = 14
-FRONT_IN_A2 = 15
-FRONT_EN_A = 9
-FRONT_IN_B1 = 18
-FRONT_IN_B2 = 23
-FRONT_EN_B = 10
-
-# Driver 2 - REAR wheels
-REAR_IN_A1 = 25
-REAR_IN_A2 = 8
-REAR_EN_A = 17
-REAR_IN_B1 = 7
-REAR_IN_B2 = 12
-REAR_EN_B = 27
-
-# If a wheel spins the wrong way, flip its value here.
-# Motors on opposite sides are mirrored, so one side usually needs flipping.
-INVERT_FRONT_LEFT = False
-INVERT_FRONT_RIGHT = False
-INVERT_REAR_LEFT = False
-INVERT_REAR_RIGHT = False
+import robot_movement as movement
 
 DRIVE_TIMEOUT = 0.5   # stop if no drive command arrives for this long (seconds)
 
-try:
-    from gpiozero import Motor
-except ImportError:
-    Motor = None
 
-fl = fr = rl = rr = None    # the four Motor objects; created by setup_motors()
-
-
-def make_motor(in1, in2, enable):
-    # pwm=True lets us set speeds between 0 and 1 using the enable pin.
-    return Motor(forward=in1, backward=in2, enable=enable, pwm=True)
-
-
-def setup_motors():
-    """Create the four motors. If anything is missing, leave them disabled (the agent still runs)."""
-    global fl, fr, rl, rr
-    pins = (FRONT_IN_A1, FRONT_IN_A2, FRONT_EN_A, FRONT_IN_B1, FRONT_IN_B2, FRONT_EN_B,
-            REAR_IN_A1, REAR_IN_A2, REAR_EN_A, REAR_IN_B1, REAR_IN_B2, REAR_EN_B)
-    if any(p is None for p in pins):
-        print("[robot] motor pins aren't filled in (see the MOTORS section of robot_agent.py); "
-              "motors disabled", flush=True)
+def handle_arm(msg):
+    """Move arm joints: {"type": "arm", "targets": {"base": 1500, ...}}, pulse widths in microseconds."""
+    targets = msg.get("targets")
+    if not isinstance(targets, dict) or len(targets) > 16:
         return
-    if Motor is None:
-        print("[robot] gpiozero isn't installed (sudo apt install python3-gpiozero python3-lgpio); "
-              "motors disabled", flush=True)
-        return
-    try:
-        fl = make_motor(FRONT_IN_A1, FRONT_IN_A2, FRONT_EN_A)   # front-left
-        fr = make_motor(FRONT_IN_B1, FRONT_IN_B2, FRONT_EN_B)   # front-right
-        rl = make_motor(REAR_IN_A1, REAR_IN_A2, REAR_EN_A)      # rear-left
-        rr = make_motor(REAR_IN_B1, REAR_IN_B2, REAR_EN_B)      # rear-right
-    except Exception as err:
-        fl = fr = rl = rr = None
-        print("[robot] couldn't set up the motors ({}: {}); motors disabled".format(
-            type(err).__name__, err), flush=True)
-        return
-    print("[robot] motors ready", flush=True)
-
-
-def set_wheel(motor, speed, invert):
-    """Set one wheel. speed goes from -1 (full reverse) to 1 (full forward)."""
-    if invert:
-        speed = -speed
-    motor.value = max(-1.0, min(1.0, speed))
-
-
-def drive(forward=0.0, strafe=0.0, rotate=0.0):
-    """
-    Mix the three mecanum movements into the four wheel speeds.
-      forward: +1 = forward,        -1 = backward
-      strafe:  +1 = slide right,    -1 = slide left
-      rotate:  +1 = turn clockwise, -1 = turn counter-clockwise
-    Values can be combined (e.g. forward + strafe = diagonal movement).
-    """
-    if fl is None:
-        return                                  # motors disabled
-    front_left = forward + strafe + rotate
-    front_right = forward - strafe - rotate
-    rear_left = forward - strafe + rotate
-    rear_right = forward + strafe - rotate
-
-    # If any wheel goes above 1, scale everything down so the direction stays correct.
-    biggest = max(abs(front_left), abs(front_right), abs(rear_left), abs(rear_right), 1.0)
-
-    set_wheel(fl, front_left / biggest, INVERT_FRONT_LEFT)
-    set_wheel(fr, front_right / biggest, INVERT_FRONT_RIGHT)
-    set_wheel(rl, rear_left / biggest, INVERT_REAR_LEFT)
-    set_wheel(rr, rear_right / biggest, INVERT_REAR_RIGHT)
-
-
-def stop_motors(reason):
-    """Stop all four wheels. Called on a hub stop command, a lost link, and exit."""
-    print("[robot] STOP ({})".format(reason), flush=True)
-    for m in (fl, fr, rl, rr):
-        if m is not None:
-            try:
-                m.stop()
-            except Exception:
-                pass
+    movement.arm_move(targets)
+    set_control("arm")
 
 
 def handle_drive(msg, state):
@@ -177,7 +78,7 @@ def handle_drive(msg, state):
         return
     if not all(math.isfinite(v) for v in values):
         return
-    drive(*values)
+    movement.drive(*values)
     set_control("drive", forward=values[0], strafe=values[1], rotate=values[2])
     # Keep moving only while commands keep arriving; drive_guard stops the robot if they stop.
     state["drive_until"] = (time.monotonic() + DRIVE_TIMEOUT) if any(values) else 0.0
@@ -533,10 +434,15 @@ async def run_session(cfg, hub, status):
                 elif kind == "stop":
                     state["drive_until"] = 0.0
                     set_control("stop")
-                    stop_motors("hub command")
+                    movement.stop_all("hub command")
                     await ws.send(json.dumps({"type": "stop_ack"}))
                 elif kind == "drive":
                     handle_drive(msg, state)
+                elif kind == "arm":
+                    handle_arm(msg)
+                elif kind == "arm_release":
+                    set_control("arm_release")
+                    movement.arm_release()
 
         async def watchdog():
             while True:
@@ -552,7 +458,7 @@ async def run_session(cfg, hub, status):
                 until = state["drive_until"]
                 if until and time.monotonic() > until:
                     state["drive_until"] = 0.0
-                    stop_motors("no drive command received")
+                    movement.stop_wheels("no drive command received")
 
         async def camera_sender():
             sent_id = 0
@@ -578,7 +484,7 @@ async def run_session(cfg, hub, status):
             raise LinkClosed("hub closed the connection")
         except Exception as err:
             # Stop right away, before closing the socket (closing can wait on a dead hub).
-            stop_motors("link lost: {}".format(err))
+            movement.stop_all("link lost: {}".format(err))
             raise
         finally:
             camera.set_wanted(False)
@@ -637,7 +543,7 @@ async def status_writer(cfg):
 
 async def main():
     cfg = load_config()
-    setup_motors()
+    movement.setup()
     hubs = cfg["hubs"]        # addresses to try in turn, e.g. the hub's IP and its .local name
     STATUS["hub_name"] = cfg["name"]
     STATUS["hub"] = hubs[0]
@@ -684,5 +590,5 @@ if __name__ == "__main__":
     except (KeyboardInterrupt, SystemExit) as exc:
         if isinstance(exc, SystemExit) and not _terminating:
             raise                                 # a config error: show its message
-        stop_motors("exit")
+        movement.stop_all("exit")
         print("[robot] stopped", flush=True)
