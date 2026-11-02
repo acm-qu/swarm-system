@@ -94,7 +94,9 @@ def serve():
     app = create_app()
 
     def run_server():
-        app.run(host="0.0.0.0", port=config.PORT, threaded=True)
+        # load_dotenv=False: Flask would otherwise read any .env it finds in this folder or above it
+        # (e.g. one in the user's home folder from another project), and a broken one stops the hub.
+        app.run(host="0.0.0.0", port=config.PORT, threaded=True, load_dotenv=False)
 
     print(f"Web page:  http://{lan_ip()}:{config.PORT}  (any device on your network)")
     if "--headless" in sys.argv:
