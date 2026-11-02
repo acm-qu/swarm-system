@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Swarm hub</title>
+<style>
+:root{
+  --bg:#fafaf9;--surface-1:#f1f0ec;--surface-2:#ffffff;
+  --border:rgba(0,0,0,.12);--border-strong:rgba(0,0,0,.25);--border-stronger:rgba(0,0,0,.4);
+  --text-primary:#1f1f1d;--text-secondary:#5f5e5a;--text-muted:#888780;
+  --bg-accent:#e6f1fb;--text-accent:#0c447c;--border-accent:#85b7eb;--fill-accent:#378add;
+  --bg-pro:#eeedfe;--border-pro:#afa9ec;--text-pro:#3c3489;
+  --bg-success:#eaf3de;--border-success:#97c459;--text-success:#27500a;--fill-success:#639922;
+  --bg-warning:#faeeda;--border-warning:#ef9f27;--text-warning:#633806;
+  --text-danger:#a32d2d;--fill-danger:#e24b4a;--on-danger:#ffffff;
+  --radius:8px;
+  --font-sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#1a1a18;--surface-1:#262624;--surface-2:#1f1f1d;
+    --border:rgba(255,255,255,.14);--border-strong:rgba(255,255,255,.28);--border-stronger:rgba(255,255,255,.45);
+    --text-primary:#f0efe9;--text-secondary:#b4b2a9;--text-muted:#888780;
+    --bg-accent:#0c447c;--text-accent:#b5d4f4;--border-accent:#378add;--fill-accent:#85b7eb;
+    --bg-pro:#3c3489;--border-pro:#7f77dd;--text-pro:#cecbf6;
+    --bg-success:#27500a;--border-success:#639922;--text-success:#c0dd97;--fill-success:#97c459;
+    --bg-warning:#633806;--border-warning:#ba7517;--text-warning:#fac775;
+    --text-danger:#f09595;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text-primary);font-family:var(--font-sans);font-size:14px;line-height:1.4}
+.wrap{max-width:1280px;margin:0 auto;padding:24px 16px}
+.cap{margin:0 0 12px;font-size:12px;color:var(--text-muted)}
+button,input,select{font-family:inherit;font-size:13px;color:var(--text-primary);background:var(--surface-2);border:0.5px solid var(--border-strong);border-radius:var(--radius);padding:6px 10px}
+button{cursor:pointer}
+button:hover{background:var(--surface-1)}
+input,select{width:100%}
+.hub{border:0.5px solid var(--border-strong);border-radius:12px;overflow:hidden;background:var(--surface-2)}
+.bar{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:0.5px solid var(--border);font-size:14px}
+.pill{font-size:12px;padding:3px 10px;border-radius:var(--radius);background:var(--bg-accent);color:var(--text-accent)}
+.stop{background:var(--fill-danger);color:var(--on-danger);border-color:transparent;font-weight:500}
+.stop:hover{background:var(--fill-danger);opacity:.9}
+.main{display:grid;grid-template-columns:240px minmax(0,1fr) 280px}
+.side{border-right:0.5px solid var(--border);padding:12px;display:flex;flex-direction:column;gap:8px;min-height:560px}
+.srv{border-left:0.5px solid var(--border);padding:14px;display:flex;flex-direction:column;gap:14px;font-size:13px}
+.center{padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0;background:var(--surface-2)}
+.tabs{display:flex;gap:2px}
+.tab{flex:1;border:none;background:transparent;color:var(--text-secondary);padding:6px 0}
+.tab.on{background:var(--surface-1);color:var(--text-primary);font-weight:500}
+.card{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:8px 10px;border:0.5px solid var(--border);background:var(--surface-2)}
+.card.on{border-color:var(--border-accent);background:var(--bg-accent)}
+.add{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;border:0.5px dashed var(--border-stronger);background:transparent;color:var(--text-secondary)}
+.form{display:none;flex-direction:column;gap:6px;padding:10px;border:0.5px solid var(--border);border-radius:var(--radius);background:var(--surface-1)}
+.form.on{display:flex}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.sub{font-size:12px;color:var(--text-secondary)}
+.h{font-size:11px;color:var(--text-muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+.ctl{border-top:0.5px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:6px}
+.pad{display:grid;grid-template-columns:repeat(3,40px);gap:4px;justify-content:center}
+.pad button{height:34px;padding:0;font-size:14px}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.kv div{background:var(--surface-1);border-radius:var(--radius);padding:5px 8px;font-size:11px;color:var(--text-secondary)}
+.kv b{display:block;font-size:13px;font-weight:500;color:var(--text-primary)}
+.panel{display:none;flex-direction:column;gap:8px}
+.panel.on{display:flex}
+.robo{cursor:pointer}
+.cone,.ring{display:none}
+.robo.on .cone,.robo.on .ring{display:block}
+.step{display:flex;align-items:center;gap:8px;padding:3px 0;color:var(--text-secondary)}
+.step.done{color:var(--text-primary)}
+.step.now{color:var(--text-accent);font-weight:500}
+.ico{width:14px;text-align:center;flex:none}
+.row{display:flex;justify-content:space-between;gap:6px;padding:3px 0}
+.logbox{font-family:var(--font-mono);font-size:11px;color:var(--text-secondary);display:flex;flex-direction:column;gap:3px}
+.err{font-size:12px;color:var(--text-danger);display:none}
+.maptools{display:flex;gap:12px;font-size:12px;color:var(--text-secondary);align-items:center}
+.maptools label{display:flex;gap:6px;align-items:center}
+.maptools input{width:auto}
+@media (max-width:980px){
+  .main{grid-template-columns:1fr}
+  .side,.srv{border:none;border-bottom:0.5px solid var(--border);min-height:0}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<p class="cap">Layout mockup. All data on this page is placeholder.</p>
+<div class="hub">
+  <div class="bar">
+    <strong style="font-weight:500">Swarm hub</strong>
+    <span class="pill" id="pill">Ready</span>
+    <span style="color:var(--text-secondary)" id="cnt">3 of 4 robots online</span>
+    <span style="flex:1"></span>
+    <button class="stop" onclick="log('All robots: stop')">&#9632; Stop all</button>
+  </div>
+  <div class="main">
+
+    <div class="side">
+      <div class="tabs">
+        <button class="tab on" onclick="tab('robots',this)">Robots</button>
+        <button class="tab" onclick="tab('jobs',this)">Jobs</button>
+        <button class="tab" onclick="tab('world',this)">World</button>
+      </div>
+
+      <div class="panel on" id="p-robots">
+        <div id="list" style="display:flex;flex-direction:column;gap:6px">
+          <button class="card on" id="c1" onclick="sel(1)"><span class="dot" style="background:var(--fill-success)"></span><span style="flex:1"><span style="font-weight:500">R1</span><br><span class="sub">Scout</span></span><span class="sub">82%</span></button>
+          <button class="card" id="c2" onclick="sel(2)"><span class="dot" style="background:var(--fill-success)"></span><span style="flex:1"><span style="font-weight:500">R2</span><br><span class="sub">Arm robot</span></span><span class="sub">76%</span></button>
+          <button class="card" id="c3" onclick="sel(3)"><span class="dot" style="background:var(--fill-success)"></span><span style="flex:1"><span style="font-weight:500">R3</span><br><span class="sub">Arm robot</span></span><span class="sub">91%</span></button>
+          <button class="card" id="c4" onclick="sel(4)"><span class="dot" style="background:var(--text-muted)"></span><span style="flex:1"><span style="font-weight:500">R4</span><br><span class="sub">Carrier</span></span><span class="sub">offline</span></button>
+        </div>
+        <button class="add" id="addbtn" onclick="tgl('addform')">+ Add robot</button>
+        <div class="form" id="addform">
+          <input type="text" id="addip" placeholder="192.168.1.25">
+          <select id="addtype"><option>Carrier</option><option>Arm robot</option><option>Scout</option><option>Custom</option></select>
+          <div style="display:flex;gap:6px">
+            <button style="flex:1" onclick="addRobot()">Connect</button>
+            <button style="flex:1" onclick="tgl('addform')">Cancel</button>
+          </div>
+          <div class="err" id="adderr">Enter the robot's address.</div>
+        </div>
+        <div class="ctl">
+          <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:500" id="ctl-name">R1 controls</span><button style="font-size:12px;padding:2px 10px" onclick="log(cur()+': stop')">Stop</button></div>
+          <div class="sub" id="abil">Camera, ultrasonic</div>
+          <div id="live">
+            <div class="pad">
+              <button aria-label="Rotate left" onclick="log(cur()+': rotate left')">&#8634;</button>
+              <button aria-label="Forward" onclick="log(cur()+': forward')">&#9650;</button>
+              <button aria-label="Rotate right" onclick="log(cur()+': rotate right')">&#8635;</button>
+              <button aria-label="Strafe left" onclick="log(cur()+': strafe left')">&#9664;</button>
+              <button aria-label="Back" onclick="log(cur()+': back')">&#9660;</button>
+              <button aria-label="Strafe right" onclick="log(cur()+': strafe right')">&#9654;</button>
+            </div>
+            <div class="kv" style="margin-top:10px">
+              <div>Distance<b id="k-us">48 cm</b></div>
+              <div>Heading<b id="k-gy">92&deg;</b></div>
+              <div>Battery<b id="k-bt">82%</b></div>
+              <div>Link<b>12 ms</b></div>
+            </div>
+          </div>
+          <div id="off" style="display:none" class="sub">Offline. Waiting to reconnect.</div>
+        </div>
+      </div>
+
+      <div class="panel" id="p-jobs">
+        <div id="joblist" style="display:flex;flex-direction:column;gap:6px"></div>
+        <button class="add" onclick="tgl('jobform')">+ New job</button>
+        <div class="form" id="jobform">
+          <input type="text" id="jname" placeholder="Sort the parcels">
+          <input type="text" id="jgoal" placeholder="Describe the goal">
+          <div style="display:flex;gap:6px">
+            <button style="flex:1" onclick="addJob()">Ask planner</button>
+            <button style="flex:1" onclick="tgl('jobform')">Cancel</button>
+          </div>
+          <div class="err" id="jerr">Give the job a name.</div>
+        </div>
+        <div class="sub">Recipes are fixed. The planner only proposes custom jobs, and the server checks them first.</div>
+      </div>
+
+      <div class="panel" id="p-world">
+        <div class="h">Targets</div>
+        <div class="kv"><div>Object A<b>32 &times; 24 cm</b></div><div>Height<b>10 cm</b></div></div>
+        <div class="h" style="margin-top:8px">Zones</div>
+        <div class="kv"><div>Zone A<b>25 &times; 20 cm</b></div></div>
+        <div class="h" style="margin-top:8px">Arena</div>
+        <div class="sub" style="color:var(--text-primary)">2 &times; 2 m, 6 tags</div>
+      </div>
+    </div>
+
+    <div class="center">
+      <div class="maptools">
+        <label><input type="checkbox" checked onchange="vis('plan',this.checked)">Plan</label>
+        <label><input type="checkbox" checked onchange="vis('cones',this.checked)">Sensors</label>
+        <span style="flex:1"></span><span id="mapjob">Lift object</span>
+      </div>
+      <svg width="100%" viewBox="0 0 320 300" role="img" style="max-height:640px">
+        <title>Top-down arena map</title>
+        <desc>Robots around a central target, with an overlay that changes with the selected job</desc>
+        <rect x="2" y="2" width="316" height="296" rx="8" fill="var(--surface-1)" stroke="var(--border-strong)" stroke-width="0.5"/>
+        <g stroke="var(--border)" stroke-width="0.4" stroke-dasharray="3 4">
+          <line x1="81" y1="2" x2="81" y2="298"/><line x1="160" y1="2" x2="160" y2="298"/><line x1="239" y1="2" x2="239" y2="298"/>
+          <line x1="2" y1="76" x2="318" y2="76"/><line x1="2" y1="150" x2="318" y2="150"/><line x1="2" y1="224" x2="318" y2="224"/>
+        </g>
+        <g id="plan">
+          <g id="ov-lift">
+            <g stroke="var(--fill-accent)" stroke-width="1.2" stroke-dasharray="5 4"><line x1="64" y1="150" x2="124" y2="150"/><line x1="256" y1="150" x2="196" y2="150"/></g>
+            <circle cx="130" cy="150" r="3.5" fill="var(--fill-accent)"/><circle cx="190" cy="150" r="3.5" fill="var(--fill-accent)"/>
+            <circle cx="160" cy="122" r="3.5" fill="var(--surface-2)" stroke="var(--border-stronger)" stroke-width="0.8"/><circle cx="160" cy="178" r="3.5" fill="var(--surface-2)" stroke="var(--border-stronger)" stroke-width="0.8"/>
+          </g>
+          <g id="ov-scan" style="display:none" fill="var(--fill-accent)" opacity="0.14">
+            <polygon points="160,76 138,122 182,122"/><polygon points="62,150 130,128 130,172"/><polygon points="258,150 190,128 190,172"/>
+          </g>
+          <g id="ov-carry" style="display:none">
+            <rect x="226" y="214" width="76" height="56" rx="4" fill="var(--bg-success)" stroke="var(--border-success)" stroke-width="0.8" stroke-dasharray="4 3"/>
+            <text x="264" y="245" text-anchor="middle" font-size="6" fill="var(--text-success)" style="font-family:var(--font-sans)">Zone A</text>
+            <line x1="192" y1="176" x2="224" y2="212" stroke="var(--fill-accent)" stroke-width="1.2" stroke-dasharray="5 4"/>
+          </g>
+        </g>
+        <rect x="130" y="122" width="60" height="56" rx="4" fill="var(--bg-warning)" stroke="var(--border-warning)" stroke-width="0.8"/>
+        <text x="160" y="153" text-anchor="middle" font-size="6" fill="var(--text-warning)" style="font-family:var(--font-sans)">Target</text>
+
+        <g class="robo on" id="r1" onclick="sel(1)" transform="translate(160,62) rotate(180)">
+          <polygon class="cone" points="0,-13 -16,-52 16,-52" fill="var(--fill-accent)" opacity="0.15"/>
+          <circle class="ring" r="24" fill="none" stroke="var(--fill-accent)" stroke-width="1.2" stroke-dasharray="4 3"/>
+          <rect x="-11" y="-14" width="22" height="28" rx="4" fill="var(--bg-pro)" stroke="var(--border-pro)" stroke-width="0.8"/>
+          <polygon points="0,-20 -5,-14 5,-14" fill="var(--text-pro)"/>
+        </g>
+        <g class="robo" id="r2" onclick="sel(2)" transform="translate(48,150) rotate(90)">
+          <polygon class="cone" points="0,-13 -16,-52 16,-52" fill="var(--fill-accent)" opacity="0.15"/>
+          <circle class="ring" r="24" fill="none" stroke="var(--fill-accent)" stroke-width="1.2" stroke-dasharray="4 3"/>
+          <rect x="-11" y="-14" width="22" height="28" rx="4" fill="var(--bg-accent)" stroke="var(--border-accent)" stroke-width="0.8"/>
+          <polygon points="0,-20 -5,-14 5,-14" fill="var(--text-accent)"/>
+        </g>
+        <g class="robo" id="r3" onclick="sel(3)" transform="translate(272,150) rotate(-90)">
+          <polygon class="cone" points="0,-13 -16,-52 16,-52" fill="var(--fill-accent)" opacity="0.15"/>
+          <circle class="ring" r="24" fill="none" stroke="var(--fill-accent)" stroke-width="1.2" stroke-dasharray="4 3"/>
+          <rect x="-11" y="-14" width="22" height="28" rx="4" fill="var(--bg-accent)" stroke="var(--border-accent)" stroke-width="0.8"/>
+          <polygon points="0,-20 -5,-14 5,-14" fill="var(--text-accent)"/>
+        </g>
+        <g class="robo" id="r4" onclick="sel(4)" transform="translate(160,245)">
+          <circle class="ring" r="24" fill="none" stroke="var(--fill-accent)" stroke-width="1.2" stroke-dasharray="4 3"/>
+          <rect x="-11" y="-14" width="22" height="28" rx="4" fill="var(--surface-2)" stroke="var(--border-strong)" stroke-width="0.8" stroke-dasharray="3 2"/>
+          <polygon points="0,-20 -5,-14 5,-14" fill="var(--text-muted)"/>
+        </g>
+        <g class="robo" id="r5" onclick="sel(5)" transform="translate(48,60) rotate(180)" style="display:none">
+          <polygon class="cone" points="0,-13 -16,-52 16,-52" fill="var(--fill-accent)" opacity="0.15"/>
+          <circle class="ring" r="24" fill="none" stroke="var(--fill-accent)" stroke-width="1.2" stroke-dasharray="4 3"/>
+          <rect x="-11" y="-14" width="22" height="28" rx="4" fill="var(--bg-success)" stroke="var(--border-success)" stroke-width="0.8"/>
+          <polygon points="0,-20 -5,-14 5,-14" fill="var(--text-success)"/>
+        </g>
+        <g font-size="6" fill="var(--text-secondary)" text-anchor="middle" style="font-family:var(--font-sans)">
+          <text x="160" y="22">R1 scout</text>
+          <text x="48" y="190">R2</text>
+          <text x="272" y="190">R3</text>
+          <text x="160" y="282">R4 offline</text>
+          <text x="48" y="102" id="t5" style="display:none">R5</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="srv">
+      <div>
+        <div class="h">Server</div>
+        <div class="row"><span>Planner</span><span style="color:var(--text-success)">Running</span></div>
+        <div class="row"><span>Heartbeats</span><span id="hb">3 of 3 ok</span></div>
+      </div>
+      <div>
+        <div class="h">Selected job</div>
+        <div style="font-size:15px;font-weight:500" id="jt">Lift object</div>
+        <div class="sub" id="jg" style="margin-bottom:8px">Raise the object together</div>
+        <button style="width:100%" onclick="runJob()">&#9654; Run job</button>
+      </div>
+      <div><div class="h">Roles</div><div id="roles"></div></div>
+      <div><div class="h">Steps</div><div id="steps"></div></div>
+      <div><div class="h">Server checks</div><div id="checks"></div></div>
+      <div><div class="h">Event log</div><div class="logbox" id="log"></div></div>
+    </div>
+
+  </div>
+</div>
+</div>
+<script>
+var D={
+ 1:{n:'R1',t:'Scout',ab:'Camera, ultrasonic',us:'48 cm',gy:'92\u00b0',bt:'82%',on:1},
+ 2:{n:'R2',t:'Arm robot',ab:'Arm, camera, ultrasonic',us:'35 cm',gy:'90\u00b0',bt:'76%',on:1},
+ 3:{n:'R3',t:'Arm robot',ab:'Arm, camera, ultrasonic',us:'35 cm',gy:'271\u00b0',bt:'91%',on:1},
+ 4:{n:'R4',t:'Carrier',ab:'Flat bed, ultrasonic',on:0}
+};
+var J={
+ lift:{name:'Lift object',kind:'Recipe',goal:'Raise the object together',roles:[{r:'Lifter',t:'Arm robot',rob:2},{r:'Lifter',t:'Arm robot',rob:3}],steps:['Scout scans target','Plan roles','Position robots','Ready barrier','Execute together'],now:2,ov:'lift',sim:'94% success'},
+ scan:{name:'Scan object',kind:'Recipe',goal:'One model from several views',roles:[{r:'Scanner',t:'Scout',rob:1},{r:'Scanner',t:'Arm robot',rob:2},{r:'Scanner',t:'Arm robot',rob:3}],steps:['Position scanners','Capture views','Fuse into one model','Report to server'],now:0,ov:'scan',sim:'92% success'},
+ carry:{name:'Carry to zone',kind:'Recipe',goal:'Move the target to a zone',roles:[{r:'Carrier',t:'Carrier',rob:4}],steps:['Load onto carrier','Drive to zone','Unload'],now:0,ov:'carry',sim:'96% success'}
+};
+var cs=1,cj='lift',running=null,nj=0,t0=Date.now(),lines=['00:00 R4 offline','00:01 plan: 2 lifters','00:03 checks passed'];
+function stamp(){var s=Math.round((Date.now()-t0)/1000)+5;return '00:'+(s<10?'0':'')+s}
+function draw(){document.getElementById('log').innerHTML=lines.slice(-5).map(function(l){return '<div>'+l+'</div>'}).join('')}
+function log(t){lines.push(stamp()+' '+t);draw()}
+function cur(){return D[cs].n}
+function tgl(id){document.getElementById(id).classList.toggle('on');['adderr','jerr'].forEach(function(e){document.getElementById(e).style.display='none'})}
+function tab(n,b){
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('on')});
+  b.classList.add('on');
+  ['robots','jobs','world'].forEach(function(p){document.getElementById('p-'+p).classList.toggle('on',p===n)});
+}
+function sel(i){
+  cs=i;
+  Object.keys(D).forEach(function(k){
+    document.getElementById('c'+k).classList.toggle('on',+k===i);
+    document.getElementById('r'+k).classList.toggle('on',+k===i);
+  });
+  var d=D[i];
+  document.getElementById('ctl-name').textContent=d.n+' controls';
+  document.getElementById('abil').textContent=d.ab;
+  document.getElementById('live').style.display=d.on?'block':'none';
+  document.getElementById('off').style.display=d.on?'none':'block';
+  if(d.on){document.getElementById('k-us').textContent=d.us;document.getElementById('k-gy').textContent=d.gy;document.getElementById('k-bt').textContent=d.bt}
+  tab('robots',document.querySelector('.tab'));
+}
+function avail(j){return j.roles.every(function(r){return r.rob&&D[r.rob]&&D[r.rob].on})}
+function state(j){return j.custom?'Awaiting checks':avail(j)?'Ready':'Blocked'}
+function ic(s){return s==='ok'?'<span class="ico" style="color:var(--text-success)">&#10003;</span>':s==='no'?'<span class="ico" style="color:var(--text-danger)">&#10005;</span>':'<span class="ico" style="color:var(--text-muted)">&#9719;</span>'}
+function render(){
+  var j=J[cj],st=state(j),p=document.getElementById('pill');
+  var label=running===cj?'Running':st;
+  p.textContent=label;
+  var c=label==='Blocked'?['bg-warning','text-warning']:label==='Running'?['bg-success','text-success']:['bg-accent','text-accent'];
+  p.style.background='var(--'+c[0]+')';p.style.color='var(--'+c[1]+')';
+  document.getElementById('jt').textContent=j.name;
+  document.getElementById('jg').textContent=j.goal;
+  document.getElementById('mapjob').textContent=j.name;
+  document.getElementById('roles').innerHTML=j.roles.map(function(r){
+    var ok=r.rob&&D[r.rob]&&D[r.rob].on;
+    var right=ok?'<span>'+D[r.rob].n+'</span>':r.rob===0?'<span class="sub">Pending</span>':'<span style="color:var(--text-danger)">Need '+r.t+'</span>';
+    return '<div class="row"><span class="sub">'+r.r+'</span>'+right+'</div>';
+  }).join('');
+  var now=running===cj?Math.min(j.now+1,j.steps.length-1):(st==='Blocked'?-1:j.now);
+  document.getElementById('steps').innerHTML=j.steps.map(function(s,i){
+    var cl=i<now?'done':i===now?'now':'';
+    var icon=i<now?'&#10003;':i===now?'&#9680;':'&#9675;';
+    return '<div class="step '+cl+'"><span class="ico">'+icon+'</span>'+s+'</div>';
+  }).join('');
+  var a=avail(j),pend=j.custom;
+  var rows=[['Robots available',pend?'wait':a?'ok':'no'],['Spacing',pend||!a?'wait':'ok'],['Reach',pend||!a?'wait':'ok'],['Simulation',pend||!a?'wait':'ok']];
+  document.getElementById('checks').innerHTML=rows.map(function(r,i){
+    var extra=(i===3&&r[1]==='ok')?'<span class="sub">'+j.sim+'</span>':'';
+    return '<div class="row"><span style="display:flex;gap:6px;align-items:center">'+ic(r[1]==='wait'?'w':r[1])+r[0]+'</span>'+extra+'</div>';
+  }).join('');
+  ['lift','scan','carry'].forEach(function(o){document.getElementById('ov-'+o).style.display=(j.ov===o)?'':'none'});
+  document.querySelectorAll('#joblist .card').forEach(function(el){el.classList.toggle('on',el.dataset.id===cj)});
+}
+function renderJobs(){
+  document.getElementById('joblist').innerHTML=Object.keys(J).map(function(k){
+    return '<button class="card'+(k===cj?' on':'')+'" data-id="'+k+'" onclick="selJob(\''+k+'\')"><span style="flex:1"><span style="font-weight:500">'+J[k].name.replace(/</g,'&lt;')+'</span><br><span class="sub">'+J[k].kind+'</span></span></button>';
+  }).join('');
+}
+function selJob(k){cj=k;render()}
+function runJob(){
+  var j=J[cj];
+  if(j.custom){log('Waiting for server checks');return}
+  if(!avail(j)){var m=j.roles.filter(function(r){return !(r.rob&&D[r.rob]&&D[r.rob].on)})[0];log('Blocked: need '+m.t);return}
+  running=cj;log('Started: '+j.name);render();
+}
+function addJob(){
+  var nm=document.getElementById('jname').value.trim(),gl=document.getElementById('jgoal').value.trim();
+  if(!nm){document.getElementById('jerr').style.display='block';return}
+  var k='c'+(++nj);
+  J[k]={name:nm,kind:'Custom',goal:gl||'Proposed by the planner',roles:[{r:'To be proposed',t:'Any',rob:0}],steps:['Planner proposes','Server validates','Approve and run'],now:1,ov:'none',custom:true,sim:''};
+  document.getElementById('jname').value='';document.getElementById('jgoal').value='';
+  document.getElementById('jobform').classList.remove('on');
+  cj=k;renderJobs();render();log('Planner proposed: '+nm.slice(0,18));
+}
+function addRobot(){
+  var ip=document.getElementById('addip').value.trim();
+  if(!ip){document.getElementById('adderr').style.display='block';return}
+  var type=document.getElementById('addtype').value;
+  var ab={'Carrier':'Flat bed, ultrasonic','Arm robot':'Arm, camera, ultrasonic','Scout':'Camera, ultrasonic','Custom':'Reported by the robot'}[type];
+  var c=document.createElement('button');
+  c.className='card';c.id='c5';c.onclick=function(){sel(5)};
+  c.innerHTML='<span class="dot" style="background:var(--fill-success)"></span><span style="flex:1"><span style="font-weight:500">R5</span><br><span class="sub">'+type+'</span></span><span class="sub">88%</span>';
+  document.getElementById('list').appendChild(c);
+  D[5]={n:'R5',t:type,ab:ab,us:'60 cm',gy:'0\u00b0',bt:'88%',on:1};
+  if(type==='Carrier'){J.carry.roles[0].rob=5}
+  document.getElementById('r5').style.display='';
+  document.getElementById('t5').style.display='';
+  document.getElementById('cnt').textContent='4 of 5 robots online';
+  document.getElementById('hb').textContent='4 of 4 ok';
+  document.getElementById('addform').classList.remove('on');
+  document.getElementById('addbtn').style.display='none';
+  log('R5 connected: '+type);
+  sel(5);render();
+}
+function vis(id,on){
+  if(id==='cones'){document.querySelectorAll('.cone').forEach(function(c){c.style.display=on?'':'none'})}
+  else{document.getElementById(id).style.display=on?'':'none'}
+}
+renderJobs();render();draw();
+</script>
+</body>
+</html>
