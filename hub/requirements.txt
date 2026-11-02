@@ -1,0 +1,7 @@
+# Hub (runs on your PC). Install with:  pip install -r hub/requirements.txt
+flask>=3.0
+flask-sock>=0.7
+simple-websocket>=1.0
+paramiko>=3.4
+cryptography>=42
+pywebview>=5.0   # optional: the app window. Without it, use `python -m hub --headless` and a browser.

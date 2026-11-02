@@ -154,11 +154,11 @@ SERVO_FREQUENCY = 50        # Hz; standard servos expect a pulse every 20 ms
 # channel moves which joint, then edit the names and widen the limits a little at a time,
 # stopping before any joint pushes against its end stop.
 ARM_JOINTS = {
-    "base":     (0, 500, 2500),
-    "shoulder": (1, 500, 2500),
-    "elbow":    (2, 500, 2500),
-    "wrist":    (3, 500, 2500),
-    "gripper":  (4, 500, 2500),
+    "base":     (0, 1000, 2000),
+    "shoulder": (1, 1000, 2000),
+    "elbow":    (2, 1000, 2000),
+    "wrist":    (3, 1000, 2000),
+    "gripper":  (4, 1000, 2000),
 }
 
 ARM_MAX_SPEED = 600         # fastest a joint may move, in microseconds of pulse per second
@@ -312,6 +312,18 @@ def setup():
     """Set up the wheels and the arm. Either may stay disabled; the agent still runs."""
     setup_wheels()
     setup_arm()
+
+
+def wheels_ready():
+    """True if the four motors were set up."""
+    return fl is not None
+
+
+def arm_limits():
+    """joint -> [lowest, highest] pulse (us) for the hub's Arm panel; empty if the arm is disabled."""
+    if arm_pwm is None:
+        return {}
+    return {joint: [low, high] for joint, (_, low, high) in ARM_JOINTS.items()}
 
 
 def stop_all(reason):

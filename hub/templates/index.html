@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Swarm Hub</title>
+  <meta name="csrf" content="{{ csrf }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='hub.css') }}">
+</head>
+<body>
+{% if user %}
+  <div class="bar">
+    <h1>Swarm Hub</h1>
+    <form method="post" action="{{ url_for('auth.logout') }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <span class="muted">Signed in as {{ user }}</span>
+      <button type="submit" class="small">Sign out</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="head">
+      <div>
+        <h2>Robots</h2>
+        <span class="muted" id="summary"></span>
+      </div>
+      <button class="primary" id="add">+ Add robot</button>
+    </div>
+    <div class="empty muted" id="none">No robots yet. Press <b>Add robot</b> to set one up.</div>
+    <div class="scroll">
+      <table id="robots" hidden>
+        <thead><tr><th>Robot</th><th>Status</th><th>Address</th><th>Last seen</th><th>Latency</th><th>Sensors</th><th>Last event</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay" hidden>
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-title">
+      <h2 id="dlg-title"></h2>
+      <p class="muted" id="dlg-intro"></p>
+      <form id="dlg-form" autocomplete="off">
+        <div id="f-add">
+          <label>IP address<input name="host" placeholder="192.168.149.1" spellcheck="false"></label>
+          <label>Username<input name="user" value="pi" spellcheck="false"></label>
+        </div>
+        <label id="f-pass">Password<input name="password" type="password" autocomplete="new-password"></label>
+        <p class="hint" id="pass-hint"></p>
+        <label id="f-name">Name <span class="muted">(optional)</span><input name="name" placeholder="picked for you, e.g. masterpi-01" spellcheck="false"></label>
+        <label class="check" id="f-reboot"><input type="checkbox" name="reboot">
+          <span>Reboot the robot when done<span class="hint" style="display:block">Proves it starts by itself and opens the status screen on its desktop. Takes about a minute.</span></span></label>
+        <label class="check" id="f-forget"><input type="checkbox" name="forget"> The robot is gone or can't be reached. Just take it off this list.</label>
+        <p class="error" id="dlg-error"></p>
+      </form>
+      <ol class="steps" id="dlg-steps"></ol>
+      <div class="note" id="dlg-note" hidden></div>
+      <div class="buttons">
+        <button type="button" id="dlg-close">Cancel</button>
+        <button type="submit" form="dlg-form" class="primary" id="dlg-go">Install</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="drive-overlay" hidden>
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="drive-title">
+      <h2 id="drive-title">Drive</h2>
+      <p class="muted">Hold a button or key to move; let go and the robot stops. Keys: W A S D to move, Q and E to turn, Space to stop.</p>
+      <div class="pad" id="drive-pad">
+        <button type="button" data-key="q">&#10226;<small>Q</small></button>
+        <button type="button" data-key="w">&#9650;<small>W</small></button>
+        <button type="button" data-key="e">&#10227;<small>E</small></button>
+        <button type="button" data-key="a">&#9664;<small>A</small></button>
+        <button type="button" class="danger" id="drive-stop">&#9632;<small>Space</small></button>
+        <button type="button" data-key="d">&#9654;<small>D</small></button>
+        <span></span>
+        <button type="button" data-key="s">&#9660;<small>S</small></button>
+        <span></span>
+      </div>
+      <label>Speed <span class="muted" id="drive-speed-label">40%</span>
+        <input id="drive-speed" type="range" min="10" max="100" value="40"></label>
+      <p class="error" id="drive-error"></p>
+      <div class="buttons"><button type="button" id="drive-close">Close</button></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="arm-overlay" hidden>
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="arm-title">
+      <h2 id="arm-title">Arm</h2>
+      <p class="muted">Each slider is a servo pulse width in microseconds. Nothing is sent until you move a slider. A joint's first move jumps straight to the slider, so start close to where it really is; after that it moves smoothly. Each slider covers the limits the robot reports for that joint (ARM_JOINTS in robot/robot_movement.py), and the robot clips every value to them.</p>
+      <div id="arm-sliders"></div>
+      <p class="error" id="arm-error"></p>
+      <div class="buttons">
+        <button type="button" id="arm-stop">Stop</button>
+        <button type="button" class="danger" id="arm-release">Release (go limp)</button>
+        <button type="button" id="arm-close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="cam-overlay" hidden>
+    <div class="dialog cam" role="dialog" aria-modal="true" aria-labelledby="cam-title">
+      <h2 id="cam-title">Camera</h2>
+      <div class="cam-box">
+        <img id="cam-img" alt="Live camera">
+        <div class="cam-msg" id="cam-msg">Waiting for the camera…</div>
+      </div>
+      <div class="buttons"><button type="button" id="cam-close">Close</button></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="term-overlay" hidden>
+    <div class="dialog term" role="dialog" aria-modal="true" aria-labelledby="term-title">
+      <h2 id="term-title">Terminal</h2>
+      <p class="muted">Runs one command at a time on the robot over SSH, as the robot's user. A folder change (cd) is remembered. Programs that need typing (nano, top, sudo asking for a password) won't work, and each command stops after 30 seconds.</p>
+      <div class="term-out" id="term-out"></div>
+      <form class="term-line" id="term-form" autocomplete="off">
+        <span class="muted prompt" id="term-prompt">~ $</span>
+        <input id="term-input" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Command">
+        <button type="submit" class="primary small" id="term-run">Run</button>
+      </form>
+      <div class="buttons">
+        <button type="button" id="term-clear">Clear</button>
+        <button type="button" id="term-close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='hub.js') }}"></script>
+{% else %}
+  <div class="narrow card">
+    <h1>Sign in</h1>
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    <form method="post" action="{{ url_for('auth.login') }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label>Username<input name="username" autocomplete="username" autofocus required></label>
+      <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+      <button type="submit" class="primary">Sign in</button>
+    </form>
+  </div>
+{% endif %}
+</body>
+</html>

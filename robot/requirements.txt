@@ -1,0 +1,15 @@
+# Robot (Raspberry Pi). The hub link needs nothing beyond Python 3.7+.
+# Each part below is optional; without it the agent still runs and that part is disabled.
+# Install with apt (works offline-friendly on Raspberry Pi OS), not pip:
+#
+#   sudo apt install python3-gpiozero python3-lgpio   # wheels, ultrasonic   (robot_movement.py, sensors.py)
+#   sudo apt install python3-smbus                    # arm via PCA9685      (robot_movement.py)
+#   sudo raspi-config nonint do_i2c 0                 # turn I2C on, once    (arm)
+#   sudo apt install python3-opencv                   # camera               (camera.py)
+#   sudo apt install python3-tk                       # status window        (status_ui.py)
+#
+# pip equivalents, if you prefer a virtualenv:
+gpiozero
+lgpio
+smbus2
+opencv-python-headless

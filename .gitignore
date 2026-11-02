@@ -1,0 +1,21 @@
+# Hub runtime data: login hashes, cookie key, robot token, SSH key, robot registry.
+# Never commit these. See README "Secrets".
+data/*
+!data/README.md
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Robot-side files the agent writes
+status.json
+status.json.tmp
+config.json
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

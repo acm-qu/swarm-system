@@ -85,3 +85,56 @@ This phase aims to have the robots lift and carry the object together
 
 ## Phase 6:
 Profit 🎉
+
+# Repository layout
+
+```
+hub/                 PC side: the Swarm Hub web app (python -m hub)
+  __main__.py        command line: adduser, token, rotate, run
+  app.py             builds the Flask app from the parts below
+  auth.py            sign-in, CSRF, blocking password guessing
+  api.py             JSON API used by the web page
+  robots.py          live WebSocket link to each robot, robot list/status
+  deploy.py          SSH: Add robot / Update / Remove / Terminal
+  jobs.py            background jobs shown step by step in the app
+  storage.py         private files in data/ (logins, keys, registry)
+  config.py          paths, limits, names
+  templates/, static/  the web page (HTML, CSS, JS)
+  server.py          old entry point, still works
+robot/               Robot side: copied onto each robot by "Add robot" / "Update"
+  robot_agent.py     entry point: connects to the hub, runs commands
+  ws_client.py       minimal WebSocket client (standard library only)
+  robot_movement.py  mecanum wheels (L298N) and arm (PCA9685): pins and limits live here
+  camera.py          USB camera stream
+  sensors.py         ultrasonic (HC-SR04); add gyro/battery here
+  status_ui.py       status window on the robot's desktop
+docs/datasheets/     datasheets and the wiring diagram (Master_Pi.fzz, open with Fritzing)
+data/                YOUR hub's secrets and robot list. Gitignored, never committed.
+```
+
+# Getting started (hub on your PC)
+
+```
+pip install -r hub/requirements.txt
+python -m hub adduser <your-name>     # create your login
+python -m hub                         # app window (or: python -m hub --headless, then open the URL)
+```
+
+Then press **Add robot** and give it the robot's IP, user and password. The hub installs everything on the
+robot over SSH. Robot-side packages are listed in `robot/requirements.txt`.
+
+Each teammate runs their own hub with their own `data/` folder. A robot belongs to the hub that installed it.
+To move a robot to your hub, Add it from your hub with the robot's password.
+
+# Secrets
+
+`data/` holds the hub's login hashes, cookie key, robot token and the SSH private key every installed robot
+trusts. It is gitignored. **Never commit it.** Earlier commits of this repo did include these files (in `SW/`),
+so anyone who can read the repo history has them. To make them useless:
+
+```
+python -m hub rotate      # new cookie key, robot token and SSH key (old ones kept as *.old)
+```
+
+Then press **Update** on each robot in the app and enter its password. That sends the new token and
+replaces the old hub key on the robot with the new one.

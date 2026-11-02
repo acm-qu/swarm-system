@@ -11,11 +11,16 @@ To run it by hand instead (over SSH), stop the service first:
 
 It needs only Python 3.7+ and its standard library for the hub link, so nothing
 has to be installed for that (handy, because a robot in hotspot mode has no
-internet). The wheels and the arm live in robot_movement.py, which the hub copies
-alongside this file; the top of that file says what each needs installed. If one
-isn't set up the agent still connects and just leaves it disabled.
+internet). The hub copies these files next to it:
+    ws_client.py        the WebSocket link to the hub (standard library only)
+    robot_movement.py   the wheels and the arm
+    camera.py           the USB camera
+    sensors.py          the ultrasonic sensor
+The top of each says what it needs installed. If one isn't set up the agent
+still connects, tells the hub that part is missing, and leaves it disabled.
 
-It reads config.json next to this file, connects to the hub, sends a heartbeat
+It reads config.json next to this file, connects to the hub, says what it can do,
+sends a heartbeat (with sensor readings)
 every second, answers ping, stop, drive, arm and arm_release commands, and reconnects by itself if
 the link drops. If the hub goes silent, or the service is stopped, it stops the
 wheels and the arm holds where it is. While driving, the robot also stops by itself if drive commands stop
@@ -27,37 +32,26 @@ user, its IP address, the hub connection, and the last command from the hub.
 """
 
 import asyncio
-import base64
 import getpass
-import hashlib
 import json
 import math
 import os
 import signal
 import socket
-import struct
 import sys
-import threading
 import time
 from pathlib import Path
+
+import robot_movement as movement   # wheels and arm: pins, servo channels and limits are set there
+import sensors
+from camera import MAX_BUFFERED, camera
+from ws_client import CONNECT_TIMEOUT, LinkClosed, WebSocket
 
 CONFIG_FILE = Path(__file__).with_name("config.json")
 STATUS_FILE = Path(__file__).with_name("status.json")
 
 HEARTBEAT_EVERY = 1.0     # seconds between heartbeats to the hub
 HUB_SILENCE_LIMIT = 3.0   # stop the robot if nothing arrives from the hub this long
-CONNECT_TIMEOUT = 5.0     # seconds allowed for connecting and for the hub's welcome
-MAX_MESSAGE = 1 << 20     # refuse messages from the hub bigger than 1 MB
-WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"   # fixed value from the WebSocket standard
-
-
-# ---------------------------------------------------------------------------
-# MOVEMENT: the wheels and the arm are in robot_movement.py (pins, servo
-# channels and limits are set there)
-# ---------------------------------------------------------------------------
-
-import robot_movement as movement
-
 DRIVE_TIMEOUT = 0.5   # stop if no drive command arrives for this long (seconds)
 
 
@@ -84,86 +78,14 @@ def handle_drive(msg, state):
     state["drive_until"] = (time.monotonic() + DRIVE_TIMEOUT) if any(values) else 0.0
 
 
-# ---------------------------------------------------------------------------
-# CAMERA: USB camera streamed to the hub as JPEG frames
-# ---------------------------------------------------------------------------
-# Needs OpenCV:  sudo apt install python3-opencv
-# The camera only runs while someone is watching it in the hub (the hub says so in
-# each heartbeat reply), so it costs nothing the rest of the time.
-
-CAMERA_INDEX = 0          # /dev/video0. If it's the wrong one, try 2, 4, ... (see: v4l2-ctl --list-devices)
-CAMERA_WIDTH = 640
-CAMERA_HEIGHT = 480
-CAMERA_FPS = 15           # frames per second sent to the hub
-JPEG_QUALITY = 70         # 1-100; lower = smaller frames
-MAX_BUFFERED = 256 * 1024  # skip a frame if this much is still waiting to be sent (slow Wi-Fi)
-
-try:
-    import cv2
-except ImportError:
-    cv2 = None
-
-
-class Camera:
-    """Grabs frames on a background thread while `want` is True; keeps the latest JPEG."""
-
-    def __init__(self):
-        self.want = False
-        self.frame = None
-        self.frame_id = 0
-        self.error = ""
-        self.thread = None
-
-    def set_wanted(self, want):
-        self.want = bool(want)
-        if self.want and (self.thread is None or not self.thread.is_alive()):
-            self.thread = threading.Thread(target=self._run, daemon=True)
-            self.thread.start()
-
-    def _run(self):
-        if cv2 is None:
-            self.error = "OpenCV isn't installed (sudo apt install python3-opencv)"
-            return
-        while self.want:
-            cap = cv2.VideoCapture(CAMERA_INDEX, cv2.CAP_V4L2)
-            if not cap.isOpened():
-                self.error = "can't open camera {} (is it plugged in?)".format(CAMERA_INDEX)
-                cap.release()
-                time.sleep(2)
-                continue
-            # Most USB cameras give JPEG natively, which is far lighter than raw video.
-            cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, CAMERA_WIDTH)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT)
-            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-            last = 0.0
-            bad = 0
-            while self.want:
-                ok, img = cap.read()
-                if not ok:
-                    bad += 1
-                    if bad > 30:
-                        self.error = "camera stopped giving frames"
-                        break
-                    time.sleep(0.05)
-                    continue
-                bad = 0
-                now = time.monotonic()
-                if now - last < 1.0 / CAMERA_FPS:
-                    continue                      # too soon; drop it
-                last = now
-                ok, jpg = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
-                if ok:
-                    self.frame = jpg.tobytes()
-                    self.frame_id += 1
-                    self.error = ""
-            cap.release()
-            if self.want:
-                time.sleep(2)
-        self.frame = None
-
-
-camera = Camera()
+def capabilities():
+    """What this robot can do, sent to the hub in the hello so its page only offers what works."""
+    return {
+        "drive": movement.wheels_ready(),
+        "arm": movement.arm_limits(),             # joint -> [lowest, highest] pulse; empty if no arm
+        "camera": camera.available(),
+        "sensors": sensors.names(),
+    }
 
 
 def current_user():
@@ -218,10 +140,6 @@ class Refused(Exception):
     """The hub answered but would not let this robot in."""
 
 
-class LinkClosed(ConnectionError):
-    """The connection to the hub ended."""
-
-
 def load_config():
     if not CONFIG_FILE.exists():
         sys.exit("Missing config.json next to robot_agent.py. Add this robot from the hub to create it.")
@@ -255,135 +173,6 @@ def split_host_port(addr):
     return host, int(port)
 
 
-def _mask(data, key):
-    """XOR data with the 4-byte key, repeated (WebSocket masking)."""
-    if not data:
-        return b""
-    pad = (key * (len(data) // 4 + 1))[:len(data)]
-    return (int.from_bytes(data, "big") ^ int.from_bytes(pad, "big")).to_bytes(len(data), "big")
-
-
-class WebSocket:
-    """Just enough of the WebSocket protocol (RFC 6455) to talk to the hub."""
-
-    def __init__(self, reader, writer):
-        self.reader = reader
-        self.writer = writer
-        self.send_lock = asyncio.Lock()
-
-    @classmethod
-    async def connect(cls, host, port, path):
-        reader, writer = await asyncio.wait_for(asyncio.open_connection(host, port), CONNECT_TIMEOUT)
-        ws = cls(reader, writer)
-        try:
-            await asyncio.wait_for(ws._handshake(host, port, path), CONNECT_TIMEOUT)
-        except BaseException:
-            writer.close()
-            raise
-        return ws
-
-    async def _handshake(self, host, port, path):
-        key = base64.b64encode(os.urandom(16)).decode()
-        host_header = "[{}]:{}".format(host, port) if ":" in host else "{}:{}".format(host, port)
-        self.writer.write((
-            "GET {} HTTP/1.1\r\n"
-            "Host: {}\r\n"
-            "Upgrade: websocket\r\n"
-            "Connection: Upgrade\r\n"
-            "Sec-WebSocket-Key: {}\r\n"
-            "Sec-WebSocket-Version: 13\r\n"
-            "\r\n".format(path, host_header, key)).encode())
-        await self.writer.drain()
-        try:
-            head = await self.reader.readuntil(b"\r\n\r\n")
-        except (asyncio.IncompleteReadError, asyncio.LimitOverrunError):
-            raise LinkClosed("hub closed the connection during the handshake")
-        lines = head.decode("latin-1").split("\r\n")
-        status = lines[0].split(" ")
-        if len(status) < 2 or status[1] != "101":
-            raise LinkClosed("not a Swarm Hub at this address (it answered: {})".format(lines[0]))
-        headers = {}
-        for line in lines[1:]:
-            name, _, value = line.partition(":")
-            headers[name.strip().lower()] = value.strip()
-        expected = base64.b64encode(hashlib.sha1((key + WS_GUID).encode()).digest()).decode()
-        if headers.get("sec-websocket-accept") != expected:
-            raise LinkClosed("bad WebSocket handshake from the hub")
-
-    async def _send_frame(self, opcode, payload):
-        n = len(payload)
-        if n < 126:
-            head = struct.pack("!BB", 0x80 | opcode, 0x80 | n)
-        elif n < 65536:
-            head = struct.pack("!BBH", 0x80 | opcode, 0x80 | 126, n)
-        else:
-            head = struct.pack("!BBQ", 0x80 | opcode, 0x80 | 127, n)
-        key = os.urandom(4)       # clients must mask what they send
-        async with self.send_lock:
-            self.writer.write(head + key + _mask(payload, key))
-            await self.writer.drain()
-
-    async def send(self, text):
-        await self._send_frame(0x1, text.encode())
-
-    async def send_bytes(self, data):
-        await self._send_frame(0x2, data)
-
-    def backlog(self):
-        """Bytes written but not yet sent (used to skip camera frames on a slow link)."""
-        try:
-            return self.writer.transport.get_write_buffer_size()
-        except Exception:
-            return 0
-
-    async def recv(self):
-        """Return the next text message. Answers pings; raises LinkClosed when the link ends."""
-        parts = []
-        size = 0
-        try:
-            while True:
-                b1, b2 = await self.reader.readexactly(2)
-                opcode, n = b1 & 0x0F, b2 & 0x7F
-                if n == 126:
-                    n, = struct.unpack("!H", await self.reader.readexactly(2))
-                elif n == 127:
-                    n, = struct.unpack("!Q", await self.reader.readexactly(8))
-                size += n
-                if size > MAX_MESSAGE:
-                    raise LinkClosed("message from the hub is too large")
-                key = await self.reader.readexactly(4) if b2 & 0x80 else None
-                data = await self.reader.readexactly(n) if n else b""
-                if key:
-                    data = _mask(data, key)
-                if opcode == 0x8:                   # close
-                    try:
-                        await self._send_frame(0x8, data[:2])
-                    except Exception:
-                        pass
-                    raise LinkClosed("hub closed the connection")
-                if opcode == 0x9:                   # ping -> pong
-                    await self._send_frame(0xA, data)
-                    continue
-                if opcode == 0xA:                   # pong
-                    continue
-                parts.append(data)
-                if b1 & 0x80:                       # last fragment
-                    return b"".join(parts).decode("utf-8", errors="replace")
-        except asyncio.IncompleteReadError:
-            raise LinkClosed("connection dropped")
-
-    async def close(self):
-        try:
-            await asyncio.wait_for(self._send_frame(0x8, struct.pack("!H", 1000)), 1)
-        except Exception:
-            pass
-        self.writer.close()
-        try:
-            await asyncio.wait_for(self.writer.wait_closed(), 1)
-        except Exception:
-            pass
-
-
 async def run_session(cfg, hub, status):
     host, port = split_host_port(hub)
     ws = await WebSocket.connect(host, port, "/robot")
@@ -394,6 +183,7 @@ async def run_session(cfg, hub, status):
             "token": cfg["token"],
             "robot_type": cfg.get("robot_type", "masterpi"),
             "hostname": STATUS["hostname"],
+            "capabilities": capabilities(),
         }))
         try:
             reply = json.loads(await asyncio.wait_for(ws.recv(), CONNECT_TIMEOUT))
@@ -411,7 +201,7 @@ async def run_session(cfg, hub, status):
 
         async def heartbeat():
             while True:
-                await ws.send(json.dumps({"type": "heartbeat", "t": time.time()}))
+                await ws.send(json.dumps({"type": "heartbeat", "t": time.time(), "sensors": sensors.read()}))
                 await asyncio.sleep(HEARTBEAT_EVERY)
 
         async def reader():
@@ -544,6 +334,7 @@ async def status_writer(cfg):
 async def main():
     cfg = load_config()
     movement.setup()
+    sensors.setup()
     hubs = cfg["hubs"]        # addresses to try in turn, e.g. the hub's IP and its .local name
     STATUS["hub_name"] = cfg["name"]
     STATUS["hub"] = hubs[0]
