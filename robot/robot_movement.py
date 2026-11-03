@@ -7,10 +7,15 @@ onto the robot together with robot_agent.py (Add robot / Update).
 WHEELS  four mecanum wheels on two L298N drivers, through gpiozero (comes with
         Raspberry Pi OS; on a Pi 5 it uses python3-lgpio).
 
-ARM     servos on a PCA9685 servo controller over I2C. The I2C bus uses
-        GPIO2 (SDA) and GPIO3 (SCL), Raspberry Pi header pins 3 and 5. Needs:
-            sudo raspi-config nonint do_i2c 0        (turn I2C on, once)
-            sudo apt install python3-smbus           (or: pip install smbus2)
+ARM     servos on a PCA9685 servo controller over I2C. The robot tries each bus in
+        ARM_I2C_BUSES and uses the first one where the board answers:
+          bus 3: software I2C on GPIO5 (SDA, header pin 29) and GPIO6 (SCL, pin 31).
+                 Used because GPIO2/3 are damaged on our first Pi. Needs this line
+                 under [all] in /boot/firmware/config.txt, then a reboot:
+                   dtoverlay=i2c-gpio,i2c_gpio_sda=5,i2c_gpio_scl=6,bus=3
+          bus 1: the Pi's normal I2C on GPIO2 (SDA, pin 3) and GPIO3 (SCL, pin 5).
+                 Needs: sudo raspi-config nonint do_i2c 0   (turn I2C on, once)
+        Either way it needs: sudo apt install python3-smbus   (or: pip install smbus2)
         The arm is optional: if I2C or the board isn't there, the arm is
         disabled and the wheels still work (and the other way round).
 
@@ -32,7 +37,7 @@ import time
 #   IN_x1 / IN_x2 = the two direction pins (L298N IN1/IN2 for A, IN3/IN4 for B)
 #   EN_x          = the enable pin (L298N ENA / ENB), used for PWM speed control
 # Remember to remove the ENA/ENB jumpers on the L298N boards.
-# GPIO2 and GPIO3 are reserved for the arm's I2C bus; don't use them here.
+# GPIO2/3 and GPIO5/6 are reserved for the arm's I2C buses; don't use them here.
 
 # Driver 1 - FRONT wheels
 FRONT_IN_A1 = 14
@@ -139,11 +144,11 @@ def stop_wheels(reason):
 
 
 # ---------------------------------------------------------------------------
-# ARM: servos on a PCA9685 over I2C (GPIO2 = SDA, GPIO3 = SCL)
+# ARM: servos on a PCA9685 over I2C (bus 3 on GPIO5/6, or bus 1 on GPIO2/3)
 # ---------------------------------------------------------------------------
 
-ARM_I2C_BUS = 1             # /dev/i2c-1, the bus on header pins 3 and 5 (GPIO2/GPIO3)
-PCA9685_ADDRESS = 0x40      # the board's default; check with:  i2cdetect -y 1
+ARM_I2C_BUSES = (3, 1)      # tried in this order; see the top of this file for the pins of each
+PCA9685_ADDRESS = 0x40      # the board's default; check with:  i2cdetect -y 3   (or -y 1)
 SERVO_FREQUENCY = 50        # Hz; standard servos expect a pulse every 20 ms
 
 # One entry per joint:  name: (PCA9685 channel, lowest pulse, highest pulse)  in microseconds.
@@ -183,11 +188,15 @@ class PCA9685:
         self.address = address
         self.period_us = 1_000_000.0 / frequency
         prescale = int(round(self.CLOCK / (4096.0 * frequency))) - 1
-        self.bus.write_byte_data(address, self.MODE1, 0x10)       # sleep, so the frequency can change
-        self.bus.write_byte_data(address, self.PRESCALE, prescale)
-        self.bus.write_byte_data(address, self.MODE1, 0x00)       # wake
-        time.sleep(0.005)
-        self.bus.write_byte_data(address, self.MODE1, 0xA0)       # restart + auto-increment registers
+        try:
+            self.bus.write_byte_data(address, self.MODE1, 0x10)   # sleep, so the frequency can change
+            self.bus.write_byte_data(address, self.PRESCALE, prescale)
+            self.bus.write_byte_data(address, self.MODE1, 0x00)   # wake
+            time.sleep(0.005)
+            self.bus.write_byte_data(address, self.MODE1, 0xA0)   # restart + auto-increment registers
+        except OSError:
+            self.bus.close()             # no board on this bus; don't leave it open while we try the next
+            raise
         # Channel values are left alone here, so a servo that was already holding keeps holding.
 
     def set_pulse(self, channel, microseconds):
@@ -212,22 +221,26 @@ arm_error = ""                    # last I2C problem, printed once per change
 def setup_arm():
     """Connect to the PCA9685. If I2C or the board isn't there, leave the arm disabled."""
     global arm_pwm, arm_thread
-    try:
-        arm_pwm = PCA9685(ARM_I2C_BUS, PCA9685_ADDRESS, SERVO_FREQUENCY)
-    except ImportError:
-        arm_pwm = None
-        print("[robot] no smbus library, so the arm is disabled (sudo apt install python3-smbus)", flush=True)
-        return
-    except OSError as err:
-        arm_pwm = None
-        print("[robot] can't reach the PCA9685 at 0x{:02X} on I2C bus {} ({}); arm disabled. "
-              "Check the wiring, that I2C is on (sudo raspi-config nonint do_i2c 0) and "
-              "i2cdetect -y {}".format(PCA9685_ADDRESS, ARM_I2C_BUS, err, ARM_I2C_BUS), flush=True)
+    problems = []
+    for bus in ARM_I2C_BUSES:
+        try:
+            arm_pwm = PCA9685(bus, PCA9685_ADDRESS, SERVO_FREQUENCY)
+            break
+        except ImportError:
+            print("[robot] no smbus library, so the arm is disabled (sudo apt install python3-smbus)", flush=True)
+            return
+        except OSError as err:
+            problems.append("bus {}: {}".format(bus, err))
+    else:
+        print("[robot] can't reach the PCA9685 at 0x{:02X} ({}); arm disabled. Check the board's power "
+              "LED and wiring (see the top of robot_movement.py for the pins), then run i2cdetect -y {} "
+              "and look for {:02x}".format(PCA9685_ADDRESS, "; ".join(problems), ARM_I2C_BUSES[0],
+                                           PCA9685_ADDRESS), flush=True)
         return
     arm_thread = threading.Thread(target=arm_loop, daemon=True)
     arm_thread.start()
-    print("[robot] arm ready (PCA9685 at 0x{:02X}); servos stay limp until the first arm command".format(
-        PCA9685_ADDRESS), flush=True)
+    print("[robot] arm ready (PCA9685 at 0x{:02X} on I2C bus {}); servos stay limp until the first arm "
+          "command".format(PCA9685_ADDRESS, bus), flush=True)
 
 
 def arm_write(joint, microseconds):

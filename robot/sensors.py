@@ -9,7 +9,7 @@ disabled and the agent runs without it. Add more sensors (gyro, battery) the sam
 set them up in setup(), list them in names(), and add their readings in read().
 """
 
-# BCM / GPIO numbers, not physical pin positions. Don't use GPIO2/GPIO3 (the arm's I2C bus)
+# BCM / GPIO numbers, not physical pin positions. Don't use GPIO2/3 or GPIO5/6 (the arm's I2C buses)
 # or any pin used by the wheels in robot_movement.py.
 ULTRASONIC_TRIGGER = None
 ULTRASONIC_ECHO = None
