@@ -322,6 +322,19 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && drv
 const DEFAULT_JOINTS = { base: [500, 2500], shoulder: [500, 2500], elbow: [500, 2500], wrist: [500, 2500], gripper: [500, 2500] };
 const armLimits = {};        // robot name -> {joint: [low, high]}, filled in by render()
 const arm = { name: null, timer: null, pending: {} };
+const armLast = {};          // robot name -> {joint: pulse} last sent, so the sliders reopen where the arm is
+
+function armRemembered(name) {
+  if (!armLast[name]) {
+    try { armLast[name] = JSON.parse(localStorage.getItem('arm:' + name)) || {}; } catch (e) { armLast[name] = {}; }
+  }
+  return armLast[name];
+}
+
+function armRemember(name, joint, value) {
+  armRemembered(name)[joint] = value;
+  try { localStorage.setItem('arm:' + name, JSON.stringify(armLast[name])); } catch (e) {}
+}
 
 function armSend() {
   arm.timer = null;
@@ -342,18 +355,24 @@ function buildArm() {
   const box = $('arm-sliders');
   box.replaceChildren();
   const joints = (arm.name && armLimits[arm.name]) || DEFAULT_JOINTS;
+  const last = armRemembered(arm.name);
   for (const [joint, [low, high]] of Object.entries(joints)) {
-    const middle = Math.round((low + high) / 20) * 10;
+    const saved = Number(last[joint]);         // start where we left it; mid-range if never moved
+    const start = Number.isFinite(saved) ? Math.min(high, Math.max(low, saved)) : Math.round((low + high) / 20) * 10;
     const label = document.createElement('label');
     const name = document.createElement('span');
     name.textContent = joint + ' ';
     const shown = document.createElement('span');
     shown.className = 'muted';
-    shown.textContent = middle + ' \u00b5s';
+    shown.textContent = start + ' \u00b5s';
     const input = document.createElement('input');
     input.type = 'range';
-    input.min = low; input.max = high; input.step = 10; input.value = middle;
-    input.oninput = () => { shown.textContent = input.value + ' \u00b5s'; armQueue(joint, Number(input.value)); };
+    input.min = low; input.max = high; input.step = 10; input.value = start;
+    input.oninput = () => {
+      shown.textContent = input.value + ' \u00b5s';
+      armRemember(arm.name, joint, Number(input.value));
+      armQueue(joint, Number(input.value));
+    };
     label.append(name, shown, input);
     box.appendChild(label);
   }
@@ -364,7 +383,7 @@ function openArm(name) {
   arm.pending = {};
   $('arm-title').textContent = 'Arm: ' + name;
   $('arm-error').textContent = '';
-  buildArm();                                 // sliders start mid-range, but nothing is sent yet
+  buildArm();                                 // sliders start where they were left, but nothing is sent yet
   $('arm-overlay').hidden = false;
 }
 

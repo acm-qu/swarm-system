@@ -153,17 +153,15 @@ SERVO_FREQUENCY = 50        # Hz; standard servos expect a pulse every 20 ms
 
 # One entry per joint:  name: (PCA9685 channel, lowest pulse, highest pulse)  in microseconds.
 #
-# THESE ARE PLACEHOLDERS until you have mapped your arm. The channel order is a guess, and
-# the 1000-2000 us limits are deliberately narrow (the servos accept 500-2500 us, but the
-# arm's own mechanics usually block part of that). Use the hub's Arm panel to find out which
-# channel moves which joint, then edit the names and widen the limits a little at a time,
-# stopping before any joint pushes against its end stop.
+# Channels were mapped on the real arm with the hub's Arm panel. The limits are the servos'
+# full 500-2500 us range, so a joint can still be driven into its end stop: if a servo
+# buzzes or strains at either end, back off and narrow that joint's limits here.
 ARM_JOINTS = {
-    "base":     (0, 1000, 2000),
-    "shoulder": (1, 1000, 2000),
-    "elbow":    (2, 1000, 2000),
-    "wrist":    (3, 1000, 2000),
-    "gripper":  (4, 1000, 2000),
+    "gripper":  (0, 500, 2500),
+    "wrist":    (1, 500, 2500),
+    "elbow":    (2, 500, 2500),
+    "shoulder": (3, 500, 2500),
+    "base":     (4, 500, 2500),
 }
 
 ARM_MAX_SPEED = 600         # fastest a joint may move, in microseconds of pulse per second
