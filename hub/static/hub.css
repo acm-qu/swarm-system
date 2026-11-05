@@ -75,6 +75,9 @@ label.check { display: flex; gap: .5rem; align-items: flex-start; font-weight: 4
 .cam-box img { display: block; width: 100%; height: auto; }
 .cam-box .cam-msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
                     color: #98a2b3; padding: 1rem; text-align: center; pointer-events: none; }
+.sens-big { font-size: 3rem; font-weight: 700; text-align: center; margin: 1rem 0 .25rem; font-variant-numeric: tabular-nums; }
+.sens-big .muted { font-size: 1.2rem; font-weight: 400; }
+#sens-range { text-align: center; }
 .dialog.term { max-width: 46rem; }
 .term-out { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; height: 45vh; overflow: auto;
             padding: .6rem .7rem; font: .85rem/1.4 ui-monospace, monospace; }

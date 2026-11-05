@@ -73,6 +73,7 @@ function render(list) {
     const can = what => !caps || (what === 'arm' ? Object.keys(caps.arm || {}).length > 0 : !!caps[what]);
     armLimits[r.name] = caps && caps.arm;
     button(td, 'Ping', () => post('/api/robots/' + encodeURIComponent(r.name) + '/ping').then(refresh, () => {}), { disabled: !live });
+    button(td, 'Sensors', () => openSens(r.name), { disabled: !live });
     button(td, 'Camera', () => openCam(r.name), { disabled: !live || !can('camera') });
     button(td, 'Drive', () => openDrive(r.name), { disabled: !live || !can('drive') });
     button(td, 'Arm', () => openArm(r.name), { disabled: !live || !can('arm') });
@@ -85,9 +86,82 @@ function render(list) {
     tr.appendChild(cellTd);
     body.appendChild(tr);
   }
+  sensUpdate(list);
 }
 
 const SENSOR_UNITS = { distance_cm: ' cm' };
+
+// ---- sensors dialog: shows the readings the robot sends in each heartbeat and says what to check
+// when there are none. It updates whenever the page refreshes the robot list (once a second).
+
+const ULTRASONIC_MAX_CM = 200;   // the robot reports this when nothing is in range (ULTRASONIC_MAX_M in robot/sensors.py)
+const sens = { name: null, low: null, high: null, count: 0 };
+
+function sensNote(text, kind) {
+  const note = $('sens-note');
+  note.hidden = !text;
+  note.className = 'note ' + (kind || '');
+  note.textContent = text || '';
+}
+
+function sensUpdate(list) {
+  if (!sens.name) return;
+  const r = list.find(x => x.name === sens.name);
+  const value = $('sens-value');
+  if (!r || r.status !== 'connected') {
+    value.textContent = '-';
+    sensNote('The robot is not connected right now.', 'warn');
+    return;
+  }
+  const d = (r.sensors || {}).distance_cm;
+  if (d === undefined) {
+    value.textContent = '-';
+    const caps = r.capabilities;
+    if (caps && !(caps.sensors || []).includes('distance_cm')) {
+      sensNote("This robot didn't report an ultrasonic sensor. Check the pins in robot/sensors.py and press Update. " +
+               'If it is still missing, run "journalctl -u swarm-agent -n 30" in the Terminal: the robot prints why it turned the sensor off.', 'bad');
+    } else {
+      sensNote('Waiting for a reading…');
+    }
+    return;
+  }
+  if (d === null) {
+    value.textContent = '-';
+    sensNote('The sensor is set up but gave no reading. Check the Echo wire and the 1 kΩ / 2 kΩ divider, and that VCC is on 5V (pin 2).', 'bad');
+    return;
+  }
+  sens.count++;
+  sens.low = sens.low === null ? d : Math.min(sens.low, d);
+  sens.high = sens.high === null ? d : Math.max(sens.high, d);
+  $('sens-range').textContent = 'Since you opened this: lowest ' + sens.low + ' cm, highest ' + sens.high + ' cm';
+  if (d >= ULTRASONIC_MAX_CM) {
+    value.textContent = '≥ ' + ULTRASONIC_MAX_CM;
+    sensNote('Nothing within ' + ULTRASONIC_MAX_CM / 100 + ' m. If it stays like this with your hand right in front of the sensor, check the Echo wire and the divider.', 'warn');
+  } else {
+    value.textContent = d;
+    if (sens.high - sens.low >= 2) sensNote('Working: the reading follows what is in front of the sensor.', 'good');
+    else if (sens.count >= 5) sensNote("The reading isn't changing. Move your hand toward the sensor. If it still doesn't change, check the wiring.", 'warn');
+    else sensNote('Getting readings. Move your hand in front of the sensor to check that it responds.');
+  }
+}
+
+function openSens(name) {
+  Object.assign(sens, { name, low: null, high: null, count: 0 });
+  $('sens-title').textContent = 'Sensors: ' + name;
+  $('sens-value').textContent = '-';
+  $('sens-range').textContent = '';
+  sensNote('Waiting for a reading…');
+  $('sens-overlay').hidden = false;
+  refresh();
+}
+
+function closeSens() {
+  sens.name = null;
+  $('sens-overlay').hidden = true;
+}
+
+$('sens-close').onclick = closeSens;
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('sens-overlay').hidden) closeSens(); });
 
 function sensorText(sensors) {
   const parts = Object.entries(sensors || {}).map(([k, v]) =>

@@ -108,6 +108,17 @@
     </div>
   </div>
 
+  <div class="overlay" id="sens-overlay" hidden>
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="sens-title">
+      <h2 id="sens-title">Sensors</h2>
+      <p class="muted">Live readings from the robot, updated every second. Move your hand toward the ultrasonic sensor and away again: the number should follow.</p>
+      <div class="sens-big"><span id="sens-value">-</span><span class="muted" id="sens-unit"> cm</span></div>
+      <p class="hint" id="sens-range"></p>
+      <div class="note" id="sens-note" hidden></div>
+      <div class="buttons"><button type="button" id="sens-close">Close</button></div>
+    </div>
+  </div>
+
   <div class="overlay" id="term-overlay" hidden>
     <div class="dialog term" role="dialog" aria-modal="true" aria-labelledby="term-title">
       <h2 id="term-title">Terminal</h2>
