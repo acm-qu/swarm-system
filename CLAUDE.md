@@ -22,8 +22,10 @@ isn't on PATH and install packages with `pip --user`:
 ```
 Don't create or commit a `.venv`. Add new hub packages to `hub/requirements.txt` so `setup` picks them up.
 On Windows, allow Python through Windows Firewall (Private network) or robots can't connect back.
-Robot packages (`python3-gpiozero`, `python3-smbus`, `python3-opencv`, ...) are listed in
-`robot/requirements.txt` and installed with apt on the Pi.
+Everything a robot needs (apt packages such as `python3-gpiozero`, `python3-smbus` and `python3-opencv`, the
+arm's I2C bus 3 overlay, and GPIO/I2C/camera groups) is in `robot/setup_robot.sh`. The hub runs it as root
+once per robot on **Add robot**, and on **Update** only if the script has changed (stamp:
+`~/swarm-agent/.setup-done`). A new robot package goes in its `PACKAGES` list.
 
 ## Rules
 

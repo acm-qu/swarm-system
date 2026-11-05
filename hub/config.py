@@ -17,6 +17,9 @@ HUB_KEY_FILE = DATA_DIR / "hub_ssh_key"     # the hub's SSH key, added to each r
 # Files copied from robot/ into the robot's folder on Add robot / Update. robot_agent.py is the entry point.
 ROBOT_FILES = ("robot_agent.py", "ws_client.py", "camera.py", "robot_movement.py", "sensors.py")
 STATUS_UI_FILE = ROBOT_DIR / "status_ui.py"  # the status screen, only copied if the robot has a desktop
+SETUP_FILE = ROBOT_DIR / "setup_robot.sh"    # installs the robot's packages; run once per robot as root
+SETUP_STAMP = ".setup-done"                  # in the robot's folder: hash of the setup script last run there
+SETUP_READ_TIMEOUT = 600   # give up on the package install if it prints nothing for this long (seconds)
 
 PORT = int(os.environ.get("PORT", "8000"))
 

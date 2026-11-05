@@ -108,6 +108,7 @@ robot/               Robot side: copied onto each robot by "Add robot" / "Update
   camera.py          USB camera stream
   sensors.py         ultrasonic (HC-SR04); add gyro/battery here
   status_ui.py       status window on the robot's desktop
+  setup_robot.sh     installs the robot's packages; run once by "Add robot"
 docs/datasheets/     datasheets and the wiring diagram (Master_Pi.fzz, open with Fritzing)
 data/                YOUR hub's secrets and robot list. Gitignored, never committed.
 ```
@@ -127,7 +128,9 @@ and you don't need a virtual environment. From the repo folder:
 If someone adds a package to `hub/requirements.txt`, everyone runs `setup` again after `git pull`.
 
 Then press **Add robot** and give it the robot's IP, user and password. The hub installs everything on the
-robot over SSH. Robot-side packages are listed in `robot/requirements.txt`.
+robot over SSH. The first time, it runs `robot/setup_robot.sh` on the robot, which installs every package
+the robot needs and turns on the arm's I2C bus. The robot needs internet for that step. Leave "Reboot the
+robot when done" ticked so the I2C bus starts working.
 
 Each teammate runs their own hub with their own `data/` folder. A robot belongs to the hub that installed it.
 To move a robot to your hub, Add it from your hub with the robot's password.

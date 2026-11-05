@@ -1,5 +1,7 @@
 """Installing robots over SSH: Add robot, Update, Remove, and the one-command-at-a-time terminal."""
 
+import hashlib
+import io
 import json
 import logging
 import re
@@ -172,16 +174,16 @@ def run_terminal(entry, command, cwd):
             "timed_out": timed_out, "truncated": truncated, "limit": config.TERM_TIMEOUT}
 
 
-def run_as_root(client, command, password):
+def run_as_root(client, command, password, timeout=60):
     """Run a command with sudo, typing the password for sudo only if the robot asks for one."""
     script = shlex.quote(command)
     code, _, _ = run(client, "sudo -n true")
     if code == 0:
-        return run(client, f"sudo -n sh -c {script}")
+        return run(client, f"sudo -n sh -c {script}", timeout=timeout)
     if not password:
         raise DeployError("This step needs administrator rights, and the robot wants its password for that. "
                           "Enter the robot's password and try again.")
-    code, out, err = run(client, f"sudo -S -p '' sh -c {script}", stdin_data=password + "\n")
+    code, out, err = run(client, f"sudo -S -p '' sh -c {script}", stdin_data=password + "\n", timeout=timeout)
     low = err.lower()
     if "incorrect password" in low or "sorry, try again" in low:
         raise DeployError("sudo on the robot rejected the password.")
@@ -283,6 +285,49 @@ def authorize_key_script(public_key):
     )
 
 
+def install_packages(job, client, facts, password):
+    """Run robot/setup_robot.sh on the robot as root: once per robot, and again only if the script changed.
+
+    A failure doesn't stop the install: the agent runs without the missing packages, and the next
+    Update tries again. Returns True if the robot needs a reboot for the changes to take effect."""
+    script = config.SETUP_FILE.read_bytes().replace(b"\r\n", b"\n")   # the Pi's sh can't read CRLF
+    stamp = hashlib.sha256(script).hexdigest()
+    folder = f"{facts['home']}/{config.REMOTE_DIR}"
+    _, done, _ = run(client, f"cat {shlex.quote(folder)}/{config.SETUP_STAMP} 2>/dev/null")
+    if done.strip() == stamp:
+        return False                                      # already set up with this exact script
+
+    step(job, "Installing the robot's packages (the first time takes a few minutes)")
+    run(client, f"mkdir -p {shlex.quote(folder)}")
+    sftp = client.open_sftp()
+    try:
+        sftp.putfo(io.BytesIO(script), f"{folder}/{config.SETUP_FILE.name}")
+    finally:
+        sftp.close()
+    try:
+        code, out, err = run_as_root(client, f"sh {shlex.quote(folder)}/{config.SETUP_FILE.name} "
+                                             f"{shlex.quote(facts['user'])}",
+                                     password, timeout=config.SETUP_READ_TIMEOUT)
+    except DeployError:
+        raise
+    except Exception as err:                              # e.g. no output for SETUP_READ_TIMEOUT
+        info(job, f"Installing the packages didn't finish ({err}). Parts that need them stay off; "
+                  "press Update to try again.")
+        return False
+    lines = [ln for ln in (out + "\n" + err).splitlines() if ln.strip()]
+    if code != 0:
+        for line in lines[-8:]:
+            info(job, line)
+        info(job, "Couldn't install all the robot's packages (see above). The agent still works, but the "
+                  "parts that need them stay off. Press Update to try again once the robot has internet.")
+        return False
+    for line in lines:
+        if line.startswith("[setup] "):
+            info(job, line[len("[setup] "):])
+    run(client, f"echo {stamp} > {shlex.quote(folder)}/{config.SETUP_STAMP}")
+    return "SWARM_REBOOT_NEEDED" in out
+
+
 def agent_log(client, password):
     """Last lines the agent printed on the robot, to explain a failure."""
     cmd = f"journalctl -u {config.SERVICE}.service -n 12 --no-pager -o cat"
@@ -335,7 +380,7 @@ def wait_for_robot(name, since, timeout=config.CONNECT_WAIT):
 
 def do_install(job, host, user, password, wanted_name=None, existing=None, reboot=False):
     """Install the agent on a robot (Add), or re-install it (Update); optionally reboot it after."""
-    for filename in config.ROBOT_FILES:
+    for filename in config.ROBOT_FILES + (config.SETUP_FILE.name,):
         if not (config.ROBOT_DIR / filename).exists():
             raise DeployError(f"robot/{filename} is missing from this repository.")
     _, public_key = hub_key()
@@ -360,6 +405,13 @@ def do_install(job, host, user, password, wanted_name=None, existing=None, reboo
         code, _, err = run(client, authorize_key_script(public_key))
         if code != 0:
             info(job, f"Couldn't add the key ({err.strip() or 'unknown error'}); updates will need the password.")
+
+        needs_reboot = install_packages(job, client, facts, password)
+        if facts.get("tk") != "yes":
+            facts = robot_facts(client)                   # tkinter may have just been installed
+        if needs_reboot and not reboot:
+            info(job, "Reboot the robot once so the arm's I2C bus turns on (press Update and tick "
+                      "'Reboot the robot when done').")
 
         screen = config.STATUS_UI_FILE.exists() and facts.get("tk") == "yes" and facts.get("desktop") == "yes"
         step(job, f"Copying the agent{' and status screen' if screen else ''} to {folder}")
@@ -441,6 +493,8 @@ def do_install(job, host, user, password, wanted_name=None, existing=None, reboo
             if screen:
                 job["message"] += (" If its status screen is open it updates itself; otherwise it opens "
                                    "the next time the robot starts.")
+            if needs_reboot:
+                job["message"] += " Reboot it once so the arm's I2C bus turns on."
             return
 
         step(job, "Rebooting the robot")
