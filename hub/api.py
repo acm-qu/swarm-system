@@ -48,7 +48,7 @@ def add_robot():
     if name and not config.NAME_RE.fullmatch(name):
         return jsonify(error="Names can use letters, digits, - and _ (up to 32)."), 400
     job = jobs.start("add", None, deploy.do_install, host=host, user=user, password=password,
-                     wanted_name=name or None, reboot=bool(data.get("reboot", True)))
+                     wanted_name=name or None, reboot=bool(data.get("reboot", False)))
     return jsonify(job=job["id"])
 
 

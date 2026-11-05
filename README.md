@@ -129,8 +129,9 @@ If someone adds a package to `hub/requirements.txt`, everyone runs `setup` again
 
 Then press **Add robot** and give it the robot's IP, user and password. The hub installs everything on the
 robot over SSH. The first time, it runs `robot/setup_robot.sh` on the robot, which installs every package
-the robot needs and turns on the arm's I2C bus. The robot needs internet for that step. Leave "Reboot the
-robot when done" ticked so the I2C bus starts working.
+the robot needs and turns on the arm's I2C bus. The robot needs internet for that step. The hub doesn't
+reboot the robot unless you tick "Reboot the robot when done". On a brand-new robot, tick it once (or
+reboot it yourself later) so the I2C bus starts working; the hub tells you when a reboot is needed.
 
 Each teammate runs their own hub with their own `data/` folder. A robot belongs to the hub that installed it.
 To move a robot to your hub, Add it from your hub with the robot's password.

@@ -215,7 +215,7 @@ function openDialog(mode, name) {
   form.host.required = mode === 'add';
   form.password.value = '';
   form.forget.checked = false;
-  form.reboot.checked = mode === 'add';
+  form.reboot.checked = false;      // rebooting is opt-in: adding a robot from another PC shouldn't restart it
   if (mode === 'add') { form.host.value = ''; form.user.value = 'pi'; form.name.value = ''; }
   showForm(true);
   $('dlg-go').textContent = t.go;

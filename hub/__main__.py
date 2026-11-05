@@ -3,8 +3,8 @@
 Run it on your computer, sign in, and press "Add robot". Give it the robot's IP
 address, username and password; the hub connects over SSH, copies the code in
 robot/ onto the robot and installs it as a service that starts on every boot,
-sets status_ui.py to open on the robot's desktop, then reboots the robot and
-waits for it to come back and connect.
+sets status_ui.py to open on the robot's desktop, and waits for it to connect.
+It only reboots the robot if you tick "Reboot the robot when done".
 
 Usage (from the repository folder):
     python -m hub adduser <name>   # create or change a login (asks for a password)
