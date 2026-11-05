@@ -79,7 +79,8 @@ def handle_drive(msg, state):
 
 
 def capabilities():
-    """What this robot can do, sent to the hub in the hello so its page only offers what works."""
+    """What this robot can do, sent to the hub in the hello (and again if it changes) so its page
+    only offers what works."""
     return {
         "drive": movement.wheels_ready(),
         "arm": movement.arm_limits(),             # joint -> [lowest, highest] pulse; empty if no arm
@@ -176,6 +177,7 @@ def split_host_port(addr):
 async def run_session(cfg, hub, status):
     host, port = split_host_port(hub)
     ws = await WebSocket.connect(host, port, "/robot")
+    hello_caps = capabilities()
     try:
         await ws.send(json.dumps({
             "type": "hello",
@@ -183,7 +185,7 @@ async def run_session(cfg, hub, status):
             "token": cfg["token"],
             "robot_type": cfg.get("robot_type", "masterpi"),
             "hostname": STATUS["hostname"],
-            "capabilities": capabilities(),
+            "capabilities": hello_caps,
         }))
         try:
             reply = json.loads(await asyncio.wait_for(ws.recv(), CONNECT_TIMEOUT))
@@ -200,8 +202,15 @@ async def run_session(cfg, hub, status):
         state = {"last_rx": time.monotonic(), "drive_until": 0.0}
 
         async def heartbeat():
+            sent_caps = hello_caps
             while True:
                 await ws.send(json.dumps({"type": "heartbeat", "t": time.time(), "sensors": sensors.read()}))
+                # The arm can show up after the hello (robot_movement keeps looking for it),
+                # so tell the hub whenever what we can do changes.
+                caps = capabilities()
+                if caps != sent_caps:
+                    await ws.send(json.dumps({"type": "capabilities", "capabilities": caps}))
+                    sent_caps = caps
                 await asyncio.sleep(HEARTBEAT_EVERY)
 
         async def reader():

@@ -164,6 +164,7 @@ ARM_JOINTS = {
 ARM_MAX_SPEED = 600         # fastest a joint may move, in microseconds of pulse per second
                             # (about 55 degrees per second on a 500-2500 us / 180 degree servo)
 ARM_UPDATE_EVERY = 0.02     # seconds between small steps toward the target
+ARM_RETRY_EVERY = 30        # seconds between tries to find the board while the arm isn't detected
 
 
 class PCA9685:
@@ -190,7 +191,7 @@ class PCA9685:
             time.sleep(0.005)
             self.bus.write_byte_data(address, self.MODE1, 0xA0)   # restart + auto-increment registers
         except OSError:
-            self.bus.close()             # no board on this bus; don't leave it open while we try the next
+            self.bus.close()             # no board answered; close the bus so the next try starts clean
             raise
         # Channel values are left alone here, so a servo that was already holding keeps holding.
 
@@ -213,24 +214,42 @@ arm_thread = None
 arm_error = ""                    # last I2C problem, printed once per change
 
 
-def setup_arm():
-    """Connect to the PCA9685. If I2C or the board isn't there, leave the arm disabled."""
+def connect_arm():
+    """Try once to reach the PCA9685. Returns None when the arm is ready, else what went wrong."""
     global arm_pwm, arm_thread
     try:
-        arm_pwm = PCA9685(ARM_I2C_BUS, PCA9685_ADDRESS, SERVO_FREQUENCY)
+        pwm = PCA9685(ARM_I2C_BUS, PCA9685_ADDRESS, SERVO_FREQUENCY)
     except ImportError:
-        print("[robot] no smbus library, so the arm is disabled (sudo apt install python3-smbus)", flush=True)
-        return
+        return "no smbus library, so the arm is disabled (sudo apt install python3-smbus)"
     except OSError as err:
-        print("[robot] can't reach the PCA9685 at 0x{:02X} on I2C bus {} ({}); arm disabled. Check the "
-              "board's power LED, the wiring and the dtoverlay line (see the top of robot_movement.py), "
-              "then run i2cdetect -y {} and look for {:02x}".format(
-                  PCA9685_ADDRESS, ARM_I2C_BUS, err, ARM_I2C_BUS, PCA9685_ADDRESS), flush=True)
-        return
+        return ("can't reach the PCA9685 at 0x{:02X} on I2C bus {} ({}); arm disabled. Check the board's "
+                "power LED, the wiring and the dtoverlay line (see the top of robot_movement.py), then run "
+                "i2cdetect -y {} and look for {:02x}".format(
+                    PCA9685_ADDRESS, ARM_I2C_BUS, err, ARM_I2C_BUS, PCA9685_ADDRESS))
     arm_thread = threading.Thread(target=arm_loop, daemon=True)
     arm_thread.start()
+    arm_pwm = pwm                 # set last: arm_limits() reports the arm as soon as this isn't None
     print("[robot] arm ready (PCA9685 at 0x{:02X} on I2C bus {}); servos stay limp until the first arm "
           "command".format(PCA9685_ADDRESS, ARM_I2C_BUS), flush=True)
+    return None
+
+
+def arm_retry_loop(problem):
+    """Keep looking for the board, so plugging it in later works without restarting the agent."""
+    while problem:
+        time.sleep(ARM_RETRY_EVERY)
+        again = connect_arm()
+        if again and again != problem:          # only print when the reason changes, not every try
+            print("[robot] " + again, flush=True)
+        problem = again
+
+
+def setup_arm():
+    """Connect to the PCA9685. If I2C or the board isn't there, try again every ARM_RETRY_EVERY seconds."""
+    problem = connect_arm()
+    if problem:
+        print("[robot] {} (trying again every {} s)".format(problem, ARM_RETRY_EVERY), flush=True)
+        threading.Thread(target=arm_retry_loop, args=(problem,), daemon=True).start()
 
 
 def arm_write(joint, microseconds):

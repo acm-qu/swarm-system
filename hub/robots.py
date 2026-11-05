@@ -152,6 +152,11 @@ def robot_socket(ws):
                 # and tells the robot whether anyone is watching its camera.
                 watching = time.time() - rec["cam_wanted"] < config.CAMERA_IDLE
                 send(rec, {"type": "heartbeat_ack", "swarm": swarm_for_robots(), "camera": watching})
+            elif kind == "capabilities":         # sent when something shows up later, like the arm
+                caps = clean_capabilities(msg.get("capabilities"))
+                if caps is not None:
+                    rec["capabilities"] = caps
+                    rec["event"] = "capabilities changed"
             elif kind == "camera_status":
                 rec["camera_error"] = str(msg.get("error", ""))[:200]
                 if rec["camera_error"]:

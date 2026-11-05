@@ -45,7 +45,8 @@ Robot packages (`python3-gpiozero`, `python3-smbus`, `python3-opencv`, ...) are 
 ## Protocol (robot <-> hub, JSON over WebSocket at /robot)
 
 Robot → hub: `hello {name, token, robot_type, hostname, capabilities}`, then `heartbeat {sensors}` every
-second, `pong`, `stop_ack`, `camera_status`, and binary JPEG frames.
+second, `capabilities {capabilities}` when they change after the hello (e.g. the arm board is found
+later), `pong`, `stop_ack`, `camera_status`, and binary JPEG frames.
 Hub → robot: `welcome`, `refused`, `heartbeat_ack {swarm, camera}`, `ping`, `stop`,
 `drive {forward, strafe, rotate}` (each -1..1), `arm {targets: {joint: microseconds}}`, `arm_release`.
 
