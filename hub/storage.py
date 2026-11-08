@@ -60,6 +60,11 @@ def get_robot_token():
     return config.TOKEN_FILE.read_text().strip()
 
 
+def new_robot_token():
+    """A robot's own token. Each robot the hub installs gets one, so a stolen robot can't pose as another."""
+    return secrets.token_urlsafe(24)
+
+
 def new_hub_key():
     """Write a fresh ed25519 SSH key for the hub."""
     from cryptography.hazmat.primitives import serialization
@@ -80,6 +85,13 @@ def rotate_secrets():
     get_secret_key()
     get_robot_token()
     new_hub_key()
+    # Each robot's own token too: like the shared one, a robot needs an Update before it is let in again.
+    with registry_lock:
+        if any(entry.get("token") for entry in registry.values()):
+            for entry in registry.values():
+                if entry.get("token"):
+                    entry["token"] = new_robot_token()
+            save_registry()
     return replaced
 
 
@@ -97,7 +109,8 @@ def load_registry():
     return {}
 
 
-registry = load_registry()   # name -> {"host", "user", "home", "host_key", "machine_id", ...}
+registry = load_registry()   # name -> {"host", "user", "home", "host_key", "machine_id", "token", ...}
+pending_tokens = {}          # name -> token given out by an install still running (guarded by registry_lock)
 
 
 def save_registry():

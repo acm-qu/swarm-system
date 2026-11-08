@@ -56,8 +56,13 @@ function render(list) {
       sub.title = "The robot's own name";
       nameTd.appendChild(sub);
     }
-    if (r.job) cell(tr, 'working…', 'busy');
-    else cell(tr, r.status, r.status);
+    const statusTd = r.job ? cell(tr, 'working…', 'busy') : cell(tr, r.status, r.status);
+    if (r.controlled_by) {                 // one person at a time drives or moves the arm
+      const sub = document.createElement('div');
+      sub.className = 'sub';
+      sub.textContent = 'controlled by ' + r.controlled_by;
+      statusTd.appendChild(sub);
+    }
     cell(tr, r.address || '-');
     cell(tr, r.seen_ago === null ? '-' : (r.seen_ago < 1 ? 'now' : Math.round(r.seen_ago) + ' s ago'));
     cell(tr, r.latency_ms === null ? '-' : r.latency_ms + ' ms');
@@ -359,9 +364,14 @@ function openDrive(name) {
   drv.timer = setInterval(driveTick, 100);
 }
 
+function releaseControl(name) {        // let a teammate take over right away
+  if (name) post('/api/robots/' + encodeURIComponent(name) + '/release_control').catch(() => {});
+}
+
 function closeDrive() {
   release();
   sendStop();
+  if (drv.name && drv.name !== arm.name) releaseControl(drv.name);
   clearInterval(drv.timer);
   drv.timer = null;
   drv.name = null;
@@ -465,6 +475,7 @@ function closeArm() {
   clearTimeout(arm.timer);
   arm.timer = null;
   arm.pending = {};
+  if (arm.name && arm.name !== drv.name) releaseControl(arm.name);
   arm.name = null;
   $('arm-overlay').hidden = true;
 }

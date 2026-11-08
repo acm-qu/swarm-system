@@ -4,9 +4,9 @@ import math
 import secrets
 import time
 
-from flask import Blueprint, Response, jsonify, request
+from flask import Blueprint, Response, jsonify, request, session
 
-from . import config, deploy, jobs, robots, storage
+from . import config, control, deploy, jobs, robots, storage
 from .auth import api_guard
 from .jobs import DeployError
 
@@ -29,6 +29,7 @@ def list_robots():
     rows = robots.robot_rows()
     for r in rows:
         r["job"] = busy.get(r["name"])
+        r["controlled_by"] = control.holder(r["name"])
     return jsonify(rows)
 
 
@@ -151,6 +152,27 @@ def online_or_409(name):
     return rec, None
 
 
+def take_control(name):
+    """Give the signed-in person control of a robot for a drive or arm command. Returns an error
+    response if someone else has it or commands come too fast, else None. Stop never needs control."""
+    user = session.get("user", "")
+    if not control.rate_ok(f"{user}:{name}"):
+        return jsonify(error="Too many commands at once. Slow down a little."), 429
+    other = control.claim(name, user)
+    if other:
+        return jsonify(error=f"{other} is controlling {name} right now. You can still press Stop. Control "
+                             f"frees up when they close the panel, or {int(config.CONTROL_LEASE)} seconds "
+                             "after their last command."), 409
+    return None
+
+
+@bp.post("/robots/<name>/release_control")
+def release_control(name):
+    """Give up control of a robot (the page calls this when its Drive or Arm panel closes)."""
+    control.release(name, session.get("user", ""))
+    return jsonify(ok=True)
+
+
 @bp.post("/robots/<name>/drive")
 def drive(name):
     """Manual control: forward, strafe and rotate, each from -1 to 1. The page repeats this
@@ -166,6 +188,9 @@ def drive(name):
     if not all(math.isfinite(v) for v in values):
         return jsonify(error="forward, strafe and rotate must be numbers from -1 to 1"), 400
     forward, strafe, rotate = (max(-1.0, min(1.0, v)) for v in values)
+    err = take_control(name)
+    if err:
+        return err
     ok = robots.send(rec, {"type": "drive", "forward": forward, "strafe": strafe, "rotate": rotate})
     rec["event"] = "driving" if any((forward, strafe, rotate)) else "drive stopped"
     return jsonify(ok=ok)
@@ -190,6 +215,9 @@ def arm(name):
         if not config.JOINT_RE.fullmatch(str(joint)) or not math.isfinite(value) or not 400 <= value <= 2600:
             return jsonify(error="bad joint name or a pulse width outside 400-2600 microseconds"), 400
         clean[joint] = value
+    err = take_control(name)
+    if err:
+        return err
     ok = robots.send(rec, {"type": "arm", "targets": clean})
     rec["event"] = "arm moved"
     return jsonify(ok=ok)
@@ -198,6 +226,9 @@ def arm(name):
 @bp.post("/robots/<name>/arm_release")
 def arm_release(name):
     rec, err = online_or_409(name)
+    if err:
+        return err
+    err = take_control(name)
     if err:
         return err
     ok = robots.send(rec, {"type": "arm_release"})

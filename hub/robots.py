@@ -51,6 +51,21 @@ def disconnect(name):
             pass
 
 
+def token_ok(name, sent):
+    """A robot with its own token (installed or updated since per-robot tokens) must send that one.
+    Robots installed earlier, and test agents that aren't on the list, still use the shared token
+    until they are updated."""
+    sent = str(sent or "").encode()
+    own = []
+    if isinstance(name, str):
+        with storage.registry_lock:
+            entry = storage.registry.get(name) or {}
+            own = [t for t in (entry.get("token"), storage.pending_tokens.get(name)) if t]
+    if own:
+        return any(secrets.compare_digest(sent, t.encode()) for t in own)
+    return secrets.compare_digest(sent, ROBOT_TOKEN.encode())
+
+
 def clean_capabilities(raw):
     """What the robot says it can do, from its hello. None means an older agent that didn't say."""
     if not isinstance(raw, dict):
@@ -95,8 +110,7 @@ def robot_socket(ws):
             auth.record_fail(key)
             ws.send(json.dumps({"type": "refused", "reason": "expected hello"}))
             return
-        token_ok = secrets.compare_digest(str(hello.get("token", "")).encode(), ROBOT_TOKEN.encode())
-        if not token_ok:
+        if not token_ok(hello.get("name"), hello.get("token")):
             auth.record_fail(key)
             ws.send(json.dumps({"type": "refused", "reason": "bad token"}))
             return

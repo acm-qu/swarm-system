@@ -28,6 +28,9 @@ The robots sense and move. A server (outside PC) does all the thinking and sends
 # Project Phases:
 The phases for the current scope of the project and how to achieve it, each phase will have some goals that have to be achieved before moving to the next phase.
 
+The control app's own build plan (a hardware track and a software track, run in parallel) is in
+`ARCHITECTURE.md`, and each robot's hardware state is in `docs/robots.md`.
+
 ## Phase 0 (Current Phase):
 This phase aims to get a singular robot working and controllable through software 
 
@@ -96,6 +99,7 @@ hub/                 PC side: the Swarm Hub web app (python -m hub)
   api.py             JSON API used by the web page
   robots.py          live WebSocket link to each robot, robot list/status
   deploy.py          SSH: Add robot / Update / Remove / Terminal
+  control.py         one person controls a robot at a time; limits how fast commands arrive
   jobs.py            background jobs shown step by step in the app
   storage.py         private files in data/ (logins, keys, registry)
   config.py          paths, limits, names
@@ -110,6 +114,9 @@ robot/               Robot side: copied onto each robot by "Add robot" / "Update
   status_ui.py       status window on the robot's desktop
   setup_robot.sh     installs the robot's packages; run once by "Add robot"
 docs/datasheets/     datasheets and the wiring diagram (Master_Pi.fzz, open with Fritzing)
+docs/UI_SPEC.md      screens and features of the new app (brief for the designer)
+docs/robots.md       every robot: wiring, faults, and the hardware-finished checklist
+ARCHITECTURE.md      how the new app is built and the order we build it in
 data/                YOUR hub's secrets and robot list. Gitignored, never committed.
 ```
 
@@ -134,17 +141,24 @@ reboot the robot unless you tick "Reboot the robot when done". On a brand-new ro
 reboot it yourself later) so the I2C bus starts working; the hub tells you when a reboot is needed.
 
 Each teammate runs their own hub with their own `data/` folder. A robot belongs to the hub that installed it.
-To move a robot to your hub, Add it from your hub with the robot's password.
+To move a robot to your hub, Add it from your hub with the robot's password. Each robot gets its own token
+when you Add or Update it. (Planned: one shared hub on a Raspberry Pi 5 in the lab that everyone opens from
+anywhere, with local hubs kept for development. See `ARCHITECTURE.md`.)
+
+Only one person controls a robot at a time: whoever drives it or moves its arm has control, and the list
+shows "controlled by ...". Anyone can always press **Stop**. Control frees up when that person closes the
+panel, or 15 seconds after their last command.
 
 # Secrets
 
-`data/` holds the hub's login hashes, cookie key, robot token and the SSH private key every installed robot
-trusts. It is gitignored. **Never commit it.** Earlier commits of this repo did include these files (in `SW/`),
-so anyone who can read the repo history has them. To make them useless:
+`data/` holds the hub's login hashes, cookie key, robot tokens (a shared one, and each robot's own in
+`robots.json`) and the SSH private key every installed robot trusts. It is gitignored. **Never commit it.**
+Earlier commits of this repo did include these files (in `SW/`), so anyone who can read the repo history has
+them. To make them useless, stop the hub first (a running hub keeps the old ones in memory), then:
 
 ```
-python -m hub rotate      # new cookie key, robot token and SSH key (old ones kept as *.old)
+python -m hub rotate      # new cookie key, robot tokens and SSH key (old ones kept as *.old)
 ```
 
-Then press **Update** on each robot in the app and enter its password. That sends the new token and
-replaces the old hub key on the robot with the new one.
+Start the hub again, then press **Update** on each robot in the app and enter its password. That sends the
+robot its new token and replaces the old hub key on the robot with the new one.

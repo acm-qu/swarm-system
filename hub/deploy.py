@@ -387,6 +387,7 @@ def do_install(job, host, user, password, wanted_name=None, existing=None, reboo
     step(job, f"Connecting to {user}@{host}")
     client, host_key = ssh_connect(host, user, password, existing and existing.get("host_key"))
     reserved = None
+    token_name = None
     try:
         step(job, "Checking the robot")
         facts = robot_facts(client)
@@ -416,7 +417,11 @@ def do_install(job, host, user, password, wanted_name=None, existing=None, reboo
         screen = config.STATUS_UI_FILE.exists() and facts.get("tk") == "yes" and facts.get("desktop") == "yes"
         step(job, f"Copying the agent{' and status screen' if screen else ''} to {folder}")
         addrs = hub_addresses(client)
-        robot_config = {"hub": addrs, "name": name, "token": robots.ROBOT_TOKEN, "robot_type": "masterpi"}
+        with storage.registry_lock:
+            token = (storage.registry.get(name) or {}).get("token") or storage.new_robot_token()
+            storage.pending_tokens[name] = token      # lets the robot in before this install is saved
+        token_name = name
+        robot_config = {"hub": addrs, "name": name, "token": token, "robot_type": "masterpi"}
         if screen:
             run(client, "mkdir -p ~/.config/autostart")
         sftp = client.open_sftp()
@@ -467,7 +472,7 @@ def do_install(job, host, user, password, wanted_name=None, existing=None, reboo
         save_registry_entry(name, {
             "host": host, "user": facts["user"], "home": facts["home"], "host_key": host_key,
             "machine_id": facts.get("machine", ""), "hostname": facts.get("hostname", ""),
-            "added": prior.get("added", time.time()), "updated": time.time(),
+            "added": prior.get("added", time.time()), "updated": time.time(), "token": token,
         })
 
         step(job, "Waiting for the robot to connect to the hub")
@@ -522,6 +527,9 @@ def do_install(job, host, user, password, wanted_name=None, existing=None, reboo
         if reserved:
             with storage.registry_lock:
                 pending_names.discard(reserved)
+        if token_name:
+            with storage.registry_lock:
+                storage.pending_tokens.pop(token_name, None)
 
 
 def do_remove(job, password, forget=False):
@@ -556,7 +564,7 @@ def do_remove(job, password, forget=False):
         storage.save_registry()
     robots.disconnect(name)
     if forget and entry:
-        job["message"] = (f"{name} is off the list. If the robot still has the agent, it will reappear "
-                          "when it connects; use Add robot then Remove to uninstall it properly.")
+        job["message"] = (f"{name} is off the list. If the robot still has the agent, use Add robot then "
+                          "Remove to uninstall it properly.")
     else:
         job["message"] = f"{name} has been removed."
