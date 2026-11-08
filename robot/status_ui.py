@@ -1,7 +1,7 @@
 """Status window shown on the robot's desktop.
 
 Shows the robot's name and user, its IP address, whether it is connected to the
-hub, and the last control signal received from the hub. It only reads
+hub, the last control signal received from the hub, and the gyro's X/Y/Z. It only reads
 status.json, which robot_agent.py keeps up to date, so it can't affect the robot.
 
 The hub starts it at desktop login. To run it by hand:  python3 status_ui.py
@@ -47,11 +47,27 @@ def describe_control(control, now):
     return "{}  ({})".format(kind.upper(), when), None
 
 
+ROT_KEYS = ("rot_x_deg", "rot_y_deg", "rot_z_deg")       # names from sensors.py
+RATE_KEYS = ("gyro_x_dps", "gyro_y_dps", "gyro_z_dps")
+
+
+def describe_gyro(sensors):
+    """What the gyro box shows: a headline, X/Y/Z rotation in degrees and X/Y/Z speed in °/s."""
+    if not any(k in sensors for k in ROT_KEYS):
+        return "no gyro (see sensors.py)", None, None
+    if all(sensors.get(k) is None for k in ROT_KEYS):
+        return "calibrating (keep still), or not answering", ("-",) * 3, ("-",) * 3
+
+    def shown(keys, unit):
+        return ["-" if sensors.get(k) is None else "{:+.1f}{}".format(sensors[k], unit) for k in keys]
+    return "0, 0, 0 = how it stood at the last calibration", shown(ROT_KEYS, "°"), shown(RATE_KEYS, "°/s")
+
+
 class StatusWindow:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("Swarm robot")
-        self.root.geometry("420x360")
+        self.root.minsize(420, 0)     # height follows the contents, so nothing gets cut off
         self.root.configure(bg=BG)
         try:
             self.root.attributes("-topmost", True)
@@ -84,16 +100,35 @@ class StatusWindow:
         self.control.pack(fill="x", padx=10)
         row = tk.Frame(box, bg="#262b33")
         row.pack(fill="x", padx=10, pady=(2, 8))
-        self.control_values = []
-        for column, label in enumerate(("Forward", "Strafe", "Rotate")):
+        self.control_values = self.three_values(row, ("Forward", "Strafe", "Rotate"))
+
+        box = tk.Frame(self.root, bg="#262b33")
+        box.pack(fill="x", padx=14, pady=(0, 12))
+        tk.Label(box, text="Gyro", bg="#262b33", fg=MUTED,
+                 font=("Helvetica", 10), anchor="w").pack(fill="x", padx=10, pady=(8, 0))
+        self.gyro = tk.Label(box, text="", bg="#262b33", fg=MUTED, font=("Helvetica", 9), anchor="w")
+        self.gyro.pack(fill="x", padx=10)
+        row = tk.Frame(box, bg="#262b33")
+        row.pack(fill="x", padx=10, pady=(2, 4))
+        self.gyro_rot = self.three_values(row, ("Rotation X", "Rotation Y", "Rotation Z"))
+        row = tk.Frame(box, bg="#262b33")
+        row.pack(fill="x", padx=10, pady=(0, 8))
+        self.gyro_rate = self.three_values(row, ("Speed X", "Speed Y", "Speed Z"))
+
+        self.tick()
+
+    @staticmethod
+    def three_values(row, labels):
+        """Three labelled numbers side by side; returns the number labels."""
+        values = []
+        for column, label in enumerate(labels):
             row.columnconfigure(column, weight=1, uniform="v")
             tk.Label(row, text=label, bg="#262b33", fg=MUTED, font=("Helvetica", 9),
                      anchor="w").grid(row=0, column=column, sticky="w")
             value = tk.Label(row, text="", bg="#262b33", fg=FG, font=("Helvetica", 14, "bold"), anchor="w")
             value.grid(row=1, column=column, sticky="w")
-            self.control_values.append(value)
-
-        self.tick()
+            values.append(value)
+        return values
 
     def tick(self):
         try:
@@ -126,6 +161,14 @@ class StatusWindow:
         headline, values = describe_control(s.get("control") or {}, now)
         self.control.config(text=headline)
         for label, text in zip(self.control_values, values or ("", "", "")):
+            label.config(text=text)
+
+        if running:
+            headline, rot, rate = describe_gyro(s.get("sensors") or {})
+        else:
+            headline, rot, rate = "waiting for the agent", None, None
+        self.gyro.config(text=headline)
+        for label, text in zip(self.gyro_rot + self.gyro_rate, list(rot or [""] * 3) + list(rate or [""] * 3)):
             label.config(text=text)
 
 

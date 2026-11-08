@@ -79,6 +79,10 @@ function render(list) {
     armLimits[r.name] = caps && caps.arm;
     button(td, 'Ping', () => post('/api/robots/' + encodeURIComponent(r.name) + '/ping').then(refresh, () => {}), { disabled: !live });
     button(td, 'Sensors', () => openSens(r.name), { disabled: !live });
+    // Zeroes the gyro's rotation. The robot must stand still for the 2 s it measures.
+    const hasGyro = !!caps && (caps.sensors || []).includes('rot_z_deg');
+    button(td, 'Calibrate gyro', () => post('/api/robots/' + encodeURIComponent(r.name) + '/gyro_calibrate').then(refresh, () => {}),
+           { disabled: !live || !hasGyro });
     button(td, 'Camera', () => openCam(r.name), { disabled: !live || !can('camera') });
     button(td, 'Drive', () => openDrive(r.name), { disabled: !live || !can('drive') });
     button(td, 'Arm', () => openArm(r.name), { disabled: !live || !can('arm') });
@@ -94,7 +98,8 @@ function render(list) {
   sensUpdate(list);
 }
 
-const SENSOR_UNITS = { distance_cm: ' cm' };
+const SENSOR_UNITS = { distance_cm: ' cm', rot_x_deg: '°', rot_y_deg: '°', rot_z_deg: '°',
+                       gyro_x_dps: '°/s', gyro_y_dps: '°/s', gyro_z_dps: '°/s' };
 
 // ---- sensors dialog: shows the readings the robot sends in each heartbeat and says what to check
 // when there are none. It updates whenever the page refreshes the robot list (once a second).
@@ -170,7 +175,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('sens-o
 
 function sensorText(sensors) {
   const parts = Object.entries(sensors || {}).map(([k, v]) =>
-    k.replace(/_cm$/, '') + ' ' + (v === null ? '-' : v + (SENSOR_UNITS[k] || '')));
+    k.replace(/_(cm|deg|dps)$/, '').replace(/^rot_/, 'rotation ').replace(/^gyro_/, 'speed ') + ' ' + (v === null ? '-' : v + (SENSOR_UNITS[k] || '')));
   return parts.length ? parts.join(' · ') : '-';
 }
 

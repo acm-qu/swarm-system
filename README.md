@@ -110,7 +110,7 @@ robot/               Robot side: copied onto each robot by "Add robot" / "Update
   ws_client.py       minimal WebSocket client (standard library only)
   robot_movement.py  mecanum wheels (L298N) and arm (PCA9685): pins and limits live here
   camera.py          USB camera stream
-  sensors.py         ultrasonic (HC-SR04); add gyro/battery here
+  sensors.py         ultrasonic (HC-SR04) and gyro (MPU-6050, I2C bus 4); add battery here
   status_ui.py       status window on the robot's desktop
   setup_robot.sh     installs the robot's packages; run once by "Add robot"
 docs/datasheets/     datasheets and the wiring diagram (Master_Pi.fzz, open with Fritzing)

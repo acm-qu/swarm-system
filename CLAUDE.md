@@ -67,7 +67,8 @@ second, `capabilities {capabilities}` when they change after the hello (e.g. the
 later), `pong`, `stop_ack`, `camera_status`, and binary JPEG frames. The hello's `token` is the robot's
 own token (or the shared one for robots not updated yet).
 Hub → robot: `welcome`, `refused`, `heartbeat_ack {swarm, camera}`, `ping`, `stop`,
-`drive {forward, strafe, rotate}` (each -1..1), `arm {targets: {joint: microseconds}}`, `arm_release`.
+`drive {forward, strafe, rotate}` (each -1..1), `arm {targets: {joint: microseconds}}`, `arm_release`,
+`gyro_calibrate` (zero the gyro's rotation; the robot must stand still for 2 s).
 
 ## Testing
 
@@ -85,4 +86,6 @@ and the hub has per-robot tokens, a control lock and a command rate limit. Two t
   arm safe limits, gyro, battery), then build robots 2-4.
 - **Software:** rotate the old secrets (S1), then simulated robots + CI (S2), the backend for the app (S3),
   the shared hub Pi (S4) and the React app (S5).
+The MPU-6050 gyro is wired on I2C bus 4 (`sensors.py`) and reports rotation `rot_{x,y,z}_deg` and turn
+rate `gyro_{x,y,z}_dps`; the hub's Calibrate gyro button zeroes it.
 After that: README Phase 2 (scanning with tags).

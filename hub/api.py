@@ -236,6 +236,16 @@ def arm_release(name):
     return jsonify(ok=ok)
 
 
+@bp.post("/robots/<name>/gyro_calibrate")
+def gyro_calibrate(name):
+    rec, err = online_or_409(name)
+    if err:
+        return err
+    ok = robots.send(rec, {"type": "gyro_calibrate"})
+    rec["event"] = "calibrating gyro: keep it still for 2 s"
+    return jsonify(ok=ok)
+
+
 @bp.post("/robots/<name>/ping")
 def ping(name):
     rec, err = online_or_409(name)

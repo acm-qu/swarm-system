@@ -34,7 +34,8 @@ import time
 #   IN_x1 / IN_x2 = the two direction pins (L298N IN1/IN2 for A, IN3/IN4 for B)
 #   EN_x          = the enable pin (L298N ENA / ENB), used for PWM speed control
 # Remember to remove the ENA/ENB jumpers on the L298N boards.
-# GPIO5/6 are the arm's I2C bus and GPIO2/3 are damaged on our first Pi; don't use them here.
+# GPIO5/6 are the arm's I2C bus, GPIO19/26 the gyro's (sensors.py) and GPIO2/3 are damaged on our
+# first Pi; don't use them here.
 
 # Driver 1 - FRONT wheels
 FRONT_IN_A1 = 14

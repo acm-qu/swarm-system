@@ -411,7 +411,7 @@ def do_install(job, host, user, password, wanted_name=None, existing=None, reboo
         if facts.get("tk") != "yes":
             facts = robot_facts(client)                   # tkinter may have just been installed
         if needs_reboot and not reboot:
-            info(job, "Reboot the robot once so the arm's I2C bus turns on (press Update and tick "
+            info(job, "Reboot the robot once so its I2C buses (arm and gyro) turn on (press Update and tick "
                       "'Reboot the robot when done').")
 
         screen = config.STATUS_UI_FILE.exists() and facts.get("tk") == "yes" and facts.get("desktop") == "yes"
@@ -499,7 +499,7 @@ def do_install(job, host, user, password, wanted_name=None, existing=None, reboo
                 job["message"] += (" If its status screen is open it updates itself; otherwise it opens "
                                    "the next time the robot starts.")
             if needs_reboot:
-                job["message"] += " Reboot it once so the arm's I2C bus turns on."
+                job["message"] += " Reboot it once so its I2C buses (arm and gyro) turn on."
             return
 
         step(job, "Rebooting the robot")

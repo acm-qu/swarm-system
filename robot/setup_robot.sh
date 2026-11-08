@@ -15,14 +15,17 @@ set -u
 PACKAGES="
 python3-gpiozero   wheels and ultrasonic sensor (robot_movement.py, sensors.py)
 python3-lgpio      the GPIO backend gpiozero uses on a Pi 5 and newer Raspberry Pi OS
-python3-smbus      arm: talks to the PCA9685 servo board over I2C (robot_movement.py)
-i2c-tools          i2cdetect, to check the arm board is wired up
+python3-smbus      arm and gyro: talk to the PCA9685 and MPU-6050 over I2C
+i2c-tools          i2cdetect, to check the arm board and gyro are wired up
 python3-opencv     camera (camera.py)
 python3-tk         status window on the robot's desktop (status_ui.py)
 "
 
-# The arm's PCA9685 is on software I2C bus 3 (GPIO5 = SDA, GPIO6 = SCL), see robot_movement.py.
-I2C_OVERLAY="dtoverlay=i2c-gpio,i2c_gpio_sda=5,i2c_gpio_scl=6,bus=3"
+# Software I2C buses. Each device has its own, so a wiring fault on one can't stop the other.
+#   bus 3: the arm's PCA9685, GPIO5 = SDA (pin 29), GPIO6 = SCL (pin 31), see robot_movement.py
+#   bus 4: the MPU-6050 gyro, GPIO19 = SDA (pin 35), GPIO26 = SCL (pin 37), see sensors.py
+ARM_I2C_OVERLAY="dtoverlay=i2c-gpio,i2c_gpio_sda=5,i2c_gpio_scl=6,bus=3"
+GYRO_I2C_OVERLAY="dtoverlay=i2c-gpio,i2c_gpio_sda=19,i2c_gpio_scl=26,bus=4"
 
 ROBOT_USER="${1:-${SUDO_USER:-}}"
 APT_OPTS="-q -y -o DPkg::Lock::Timeout=180"   # wait if the Pi is busy with its own updates
@@ -58,24 +61,30 @@ if ! apt-get $APT_OPTS install --no-install-recommends $wanted; then
     exit 1
 fi
 
-# 2. Arm I2C bus ---------------------------------------------------------------------------
+# 2. I2C buses for the arm and gyro --------------------------------------------------------
 if [ -f /boot/firmware/config.txt ]; then
     boot_config=/boot/firmware/config.txt       # Raspberry Pi OS Bookworm and newer
 else
     boot_config=/boot/config.txt                # older Raspberry Pi OS
 fi
-if [ -f "$boot_config" ]; then
-    if grep -q "^[[:space:]]*$I2C_OVERLAY[[:space:]]*$" "$boot_config"; then
-        say "Arm I2C bus 3 is already turned on in $boot_config"
-    else
-        [ -f "$boot_config.swarm-backup" ] || cp "$boot_config" "$boot_config.swarm-backup"
-        printf '\n[all]\n# Swarm: the arm'"'"'s I2C bus 3 on GPIO5 (SDA) / GPIO6 (SCL)\n%s\n' \
-            "$I2C_OVERLAY" >> "$boot_config"
-        say "Turned on the arm's I2C bus 3 in $boot_config (works after a reboot)"
-        reboot_needed=1
+
+# add_overlay <line> <what it is>: append the line to the boot config once.
+add_overlay() {
+    if grep -q "^[[:space:]]*$1[[:space:]]*$" "$boot_config"; then
+        say "$2 is already turned on in $boot_config"
+        return
     fi
+    [ -f "$boot_config.swarm-backup" ] || cp "$boot_config" "$boot_config.swarm-backup"
+    printf '\n[all]\n# Swarm: %s\n%s\n' "$2" "$1" >> "$boot_config"
+    say "Turned on $2 in $boot_config (works after a reboot)"
+    reboot_needed=1
+}
+
+if [ -f "$boot_config" ]; then
+    add_overlay "$ARM_I2C_OVERLAY" "the arm's I2C bus 3 on GPIO5 (SDA) / GPIO6 (SCL)"
+    add_overlay "$GYRO_I2C_OVERLAY" "the gyro's I2C bus 4 on GPIO19 (SDA) / GPIO26 (SCL)"
 else
-    say "No $boot_config, so the arm's I2C bus wasn't set up. Is this a Raspberry Pi?"
+    say "No $boot_config, so the I2C buses weren't set up. Is this a Raspberry Pi?"
 fi
 
 # /dev/i2c-* only exists with the i2c-dev module loaded; load it now and on every boot.

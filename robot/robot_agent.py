@@ -109,6 +109,7 @@ STATUS = {
     "error": "",                        # why it isn't connected
     "swarm": [],                        # every robot the hub knows, from the hub
     "control": {},                      # the last command received from the hub (see set_control)
+    "sensors": {},                      # latest readings from sensors.py, e.g. the gyro's x/y/z
     "updated": 0,
 }
 
@@ -242,6 +243,11 @@ async def run_session(cfg, hub, status):
                 elif kind == "arm_release":
                     set_control("arm_release")
                     movement.arm_release()
+                elif kind == "gyro_calibrate":
+                    # Zero the gyro's rotation; it measures for 2 s in its own thread, so this
+                    # doesn't hold up the link. The robot should stand still meanwhile.
+                    set_control("gyro_calibrate")
+                    sensors.calibrate_gyro()
 
         async def watchdog():
             while True:
@@ -331,6 +337,7 @@ async def status_writer(cfg):
             STATUS["ips"] = await local_ips(cfg)
             next_ip_check = now + 10
         STATUS["updated"] = now
+        STATUS["sensors"] = sensors.read()     # latest values only; never waits on hardware
         try:
             tmp = STATUS_FILE.with_name("status.json.tmp")
             tmp.write_text(json.dumps(STATUS))
