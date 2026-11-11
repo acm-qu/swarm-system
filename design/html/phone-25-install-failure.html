@@ -1,0 +1,253 @@
+<!doctype html><html lang="en" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=390"><title>Swarm Hub · Phone · Sheet · Install failed</title><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet"><style>
+:root{
+  --bg:#0D1117; --sidebar:#10161E; --topbar:#121922; --surface:#161D26; --surface-raised:#202A35;
+  --surface-deep:#111821; --border:#27313D; --border-strong:#36414E;
+  --text:#E8EDF2; --text-2:#9AA9B8; --text-3:#7F95AA;
+  --accent:#E8AC65; --accent-hover:#F0BC80; --accent-text:#0D1117;
+  --accent-soft:rgba(232,172,101,.12); --accent-border:rgba(232,172,101,.35);
+  --ok:#22C55E; --ok-text:#4ADE80; --ok-bg:rgba(34,197,94,.12); --ok-border:rgba(34,197,94,.35);
+  --warn:#F59E0B; --warn-text:#FBBF24; --warn-bg:rgba(245,158,11,.13); --warn-border:rgba(245,158,11,.45);
+  --off:#94A3B8; --off-bg:rgba(148,163,184,.10); --off-border:rgba(148,163,184,.28);
+  --info:#3B82F6; --info-text:#93C5FD; --info-bg:rgba(59,130,246,.14); --info-border:rgba(59,130,246,.45);
+  --stop:#EF4444; --stop-text:#FFFFFF; --stop-deep:#DC2626; --stop-bg:rgba(239,68,68,.12); --stop-border:rgba(239,68,68,.45);
+  --you-bg:#E8EDF2; --you-text:#0D1117;
+  --overlay:rgba(5,8,12,.62);
+}
+[data-theme=light]{
+  --bg:#F0F2F5; --sidebar:#F7F8FA; --topbar:#FBFBFC; --surface:#FFFFFF; --surface-raised:#F3F5F7;
+  --surface-deep:#E9EDF1; --border:#E1E5EA; --border-strong:#CDD3DA;
+  --text:#1B2430; --text-2:#5B6876; --text-3:#7A8796;
+  --accent:#E8AC65; --accent-hover:#F0BC80; --accent-text:#1B2430;
+  --accent-soft:rgba(232,172,101,.20); --accent-border:rgba(217,149,78,.55);
+  --ok:#16A34A; --ok-text:#15803D; --ok-bg:rgba(22,163,74,.10); --ok-border:rgba(22,163,74,.35);
+  --warn:#D97706; --warn-text:#B45309; --warn-bg:rgba(245,158,11,.14); --warn-border:rgba(217,119,6,.45);
+  --off:#64748B; --off-bg:rgba(100,116,139,.08); --off-border:rgba(100,116,139,.30);
+  --info:#2563EB; --info-text:#1D4ED8; --info-bg:rgba(37,99,235,.10); --info-border:rgba(37,99,235,.40);
+  --stop:#DC2626; --stop-deep:#B91C1C;
+  --you-bg:#1B2430; --you-text:#FFFFFF;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg)}
+body{font-family:-apple-system,BlinkMacSystemFont,"Inter","Helvetica Neue",Arial,sans-serif;color:var(--text);
+  font-size:14px;line-height:1.4;-webkit-font-smoothing:antialiased}
+.mono{font-family:"IBM Plex Mono","SF Mono",ui-monospace,monospace}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+.muted{color:var(--text-2)} .faint{color:var(--text-3)}
+svg.i{display:inline-block;flex:none;vertical-align:middle}
+.row{display:flex;align-items:center} .col{display:flex;flex-direction:column}
+.gap4{gap:4px}.gap6{gap:6px}.gap8{gap:8px}.gap10{gap:10px}.gap12{gap:12px}.gap16{gap:16px}.gap20{gap:20px}
+.grow{flex:1;min-width:0} .between{justify-content:space-between}
+
+/* app frame */
+.app{display:flex;width:1440px;min-height:900px;background:var(--bg);position:relative}
+.side{width:232px;flex:none;background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:16px 14px}
+.brand{display:flex;align-items:center;gap:11px;padding:4px 6px 18px}
+.logo{color:var(--text);width:32px;height:32px;border-radius:9px;background:var(--surface-raised);border:1px solid var(--border-strong);display:flex;align-items:center;justify-content:center}
+.brand b{font-size:16px;font-weight:600;display:block;line-height:1.2}
+.brand span{font-size:12px;color:var(--text-2)}
+.nav a{display:flex;align-items:center;gap:12px;height:38px;padding:0 12px;border-radius:9px;color:var(--text-2);font-size:14.5px;text-decoration:none;position:relative;margin-bottom:2px}
+.nav a.on{background:var(--accent-soft);color:var(--text)}
+.nav a.on svg{color:var(--accent)}
+.nav a.on:before{content:"";position:absolute;left:-14px;top:9px;width:3px;height:20px;border-radius:2px;background:var(--accent)}
+.nav a.soon{opacity:.55}
+.nav .tag{margin-left:auto;font-size:11.5px;border:1px solid var(--border-strong);border-radius:999px;padding:1px 7px;color:var(--text-2)}
+.navsep{height:1px;background:var(--border);margin:12px 6px}
+.me{margin-top:auto;border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:10px;display:flex;gap:10px;align-items:center}
+.me b{font-weight:500;font-size:13.5px;display:block} .me span{font-size:12px;color:var(--text-2)}
+.signout{display:flex;align-items:center;gap:10px;color:var(--text-2);padding:16px 10px 4px;font-size:14px}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.top{height:64px;flex:none;background:var(--topbar);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 12px 0 28px;gap:14px}
+.crumb{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:500}
+.crumb .up{color:var(--text-3);font-weight:400}
+.chip{display:flex;align-items:center;gap:7px;height:30px;padding:0 11px;border:1px solid var(--border);border-radius:999px;font-size:12.5px;color:var(--text-2);white-space:nowrap}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok);flex:none}
+.vsep{width:1px;height:26px;background:var(--border)}
+.bell{position:relative;color:var(--text-2);display:flex}
+.bell i{position:absolute;top:-6px;right:-7px;font-style:normal;font-size:10px;background:var(--surface-raised);border:1px solid var(--border-strong);color:var(--text);border-radius:999px;min-width:15px;height:15px;display:flex;align-items:center;justify-content:center}
+.content{padding:24px 28px 28px;flex:1}
+
+/* avatars, monograms */
+.av{width:22px;height:22px;border-radius:50%;background:var(--surface-raised);border:1px solid var(--border-strong);font-size:10px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;flex:none;color:var(--text)}
+.av.lg{width:30px;height:30px;font-size:11.5px}
+.mg{width:36px;height:36px;border-radius:10px;border:1px solid var(--border-strong);background:var(--surface-deep);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none;letter-spacing:.02em}
+.mg.sm{width:24px;height:24px;border-radius:7px;font-size:10.5px}
+.mg.lg{width:46px;height:46px;border-radius:12px;font-size:15px}
+
+/* pills */
+.pill{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:999px;border:1px solid;font-size:13px;font-weight:500;white-space:nowrap}
+.pill.sm{height:22px;padding:0 8px;font-size:12px;gap:5px}
+.p-ok{color:var(--ok-text);background:var(--ok-bg);border-color:var(--ok-border)}
+.p-warn{color:var(--warn-text);background:var(--warn-bg);border-color:var(--warn-border)}
+.p-off{color:var(--off);background:var(--off-bg);border-color:var(--off-border)}
+.p-info{color:var(--info-text);background:var(--info-bg);border-color:var(--info-border)}
+.p-move{color:#fff;background:var(--info);border-color:var(--info)}
+.p-ctl{color:var(--text);background:transparent;border-color:var(--border-strong);padding-left:3px}
+.p-you{color:var(--you-text);background:var(--you-bg);border-color:var(--you-bg);padding-left:3px}
+.p-you .av{background:var(--you-text);color:var(--you-bg);border-color:var(--you-text)}
+.p-nobody{color:var(--text-2);background:transparent;border-color:var(--border-strong);border-style:dashed}
+.p-fail{color:#FCA5A5;background:var(--stop-bg);border-color:var(--stop-border)}
+.bars{display:inline-flex;gap:2px;align-items:center;margin-left:2px}
+.bars i{width:3px;height:10px;border-radius:1px;background:currentColor;display:block;opacity:.9}
+.bars i:nth-child(2){opacity:.7}.bars i:nth-child(3){opacity:.5}
+
+/* buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:36px;padding:0 14px;border-radius:10px;font-size:14px;font-weight:500;border:1px solid var(--border-strong);background:var(--surface-raised);color:var(--text);white-space:nowrap}
+.btn.sm{height:30px;padding:0 10px;font-size:13px;border-radius:9px}
+.btn.icon{width:36px;padding:0}
+.btn.sm.icon{width:30px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-text)}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--text-2)}
+.btn.stop{background:var(--stop);border-color:var(--stop);color:#fff;font-weight:600}
+.btn.stop-off{background:transparent;border-color:var(--border);color:var(--text-3)}
+.btn.danger-soft{background:var(--stop-bg);border-color:var(--stop-border);color:#FCA5A5}
+.btn.danger{background:var(--stop-deep);border-color:var(--stop-deep);color:#fff}
+.btn.dis{opacity:.45}
+.kbd{font-family:"IBM Plex Mono",monospace;font-size:11px;padding:1px 6px;border-radius:5px;border:1px solid rgba(255,255,255,.35);background:rgba(0,0,0,.18);font-weight:500}
+.kbd.n{border-color:var(--border-strong);background:var(--surface-deep);color:var(--text-2)}
+.stopall{height:42px;padding:0 14px;font-size:15.5px;box-shadow:0 4px 18px rgba(239,68,68,.35)}
+
+/* cards */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px}
+.card-h{display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--border)}
+.card-h h3{font-size:16px;font-weight:600}
+.card-b{padding:16px 18px}
+.help{width:20px;height:20px;border-radius:50%;border:1px solid var(--border-strong);color:var(--text-2);display:inline-flex;align-items:center;justify-content:center;flex:none}
+.note{display:flex;gap:10px;align-items:flex-start;border-radius:10px;padding:11px 13px;font-size:13.5px;border:1px solid var(--border);background:var(--surface-deep);color:var(--text-2)}
+.note.good{color:var(--text);background:var(--ok-bg);border-color:var(--ok-border)} .note.good svg{color:var(--ok-text)}
+.note.warn{color:var(--text);background:var(--warn-bg);border-color:var(--warn-border)} .note.warn svg{color:var(--warn-text)}
+.note.bad{color:var(--text);background:var(--stop-bg);border-color:var(--stop-border)} .note.bad svg{color:#F87171}
+.note.info{color:var(--text);background:var(--info-bg);border-color:var(--info-border)} .note.info svg{color:var(--info-text)}
+.h1{font-size:19px;font-weight:600} .sub{font-size:13px;color:var(--text-2);margin-top:3px}
+.lbl{font-size:12.5px;color:var(--text-2)}
+
+/* robot view */
+.rhead{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.rhead .name{font-size:21px;font-weight:600;line-height:1.15}
+.rhead .meta{font-size:12.5px;color:var(--text-2);margin-top:3px;white-space:nowrap}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:18px}
+.tab{display:flex;align-items:center;gap:7px;height:42px;padding:0 11px;color:var(--text-2);font-size:14.5px;position:relative}
+.tab.on{color:var(--text)} .tab.on svg{color:var(--accent)}
+.tab.on:after{content:"";position:absolute;left:6px;right:6px;bottom:-1px;height:2px;background:var(--accent);border-radius:2px}
+.cam{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--border);background:var(--surface-deep)}
+.cam svg.scene{display:block;width:100%;height:100%}
+.cam .ov{position:absolute;display:flex;align-items:center;gap:6px;background:rgba(10,13,18,.78);border:1px solid rgba(255,255,255,.08);border-radius:9px;color:#E8EDF2;font-size:13px;padding:0 10px;height:30px}
+.seg{display:flex;padding:3px;gap:2px;background:rgba(10,13,18,.82);border:1px solid rgba(255,255,255,.08);border-radius:10px}
+.seg span{padding:5px 10px;border-radius:7px;font-size:13px;color:#C9D2DB}
+.seg span.on{background:var(--accent);color:#0D1117;font-weight:500}
+.strip{display:flex;border:1px solid var(--border);border-radius:14px;background:var(--surface);margin-top:14px}
+.strip>div{padding:14px 16px;border-right:1px solid var(--border)} .strip>div:last-child{border-right:0}
+.big{font-size:24px;font-weight:500} .big small{font-size:13px;color:var(--text-2);font-weight:400;margin-left:2px}
+.xyz{display:flex;gap:16px} .xyz>div{display:flex;flex-direction:column} .xyz .lbl{font-size:11.5px}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.key{position:relative;height:74px;border-radius:11px;border:1px solid var(--border-strong);background:var(--surface-raised);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;color:var(--text-2);font-size:12.5px}
+.key svg{color:var(--text)}
+.key .kl{position:absolute;top:7px;left:7px;font-family:"IBM Plex Mono",monospace;font-size:10.5px;border:1px solid var(--border-strong);border-radius:5px;padding:0 5px;color:var(--text-2);background:var(--surface-deep)}
+.key.held{background:var(--accent);border-color:var(--accent);color:#0D1117;font-weight:500;box-shadow:0 0 0 4px var(--accent-soft)}
+.key.held svg{color:#0D1117} .key.held .kl{background:rgba(0,0,0,.12);border-color:rgba(0,0,0,.25);color:#0D1117}
+.key.stopk{background:var(--stop);border-color:var(--stop);color:#fff;font-weight:600}
+.key.stopk svg{color:#fff}
+.key.ro{background:transparent;border-style:dashed;color:var(--text-3)} .key.ro svg{color:var(--text-3)}
+.slider{position:relative;height:16px;display:flex;align-items:center}
+.slider .tr{height:4px;border-radius:2px;background:var(--border-strong);width:100%}
+.slider .fill{position:absolute;left:0;height:4px;border-radius:2px;background:var(--accent)}
+.slider .th{position:absolute;width:18px;height:18px;border-radius:50%;background:#F4F1EC;border:3px solid var(--accent);transform:translateX(-9px)}
+.slider.ro .th{background:var(--surface);border:2px solid var(--text-3)} .slider.ro .fill{display:none}
+.sending{border:1px solid var(--border);background:var(--surface-deep);border-radius:9px;padding:10px 13px;font-family:"IBM Plex Mono",monospace;font-size:12.5px;color:var(--text-2)}
+.sending b{color:var(--text);font-weight:500}
+.ctl{padding:14px 16px}
+.list{display:flex;flex-direction:column;gap:8px}
+.rrow{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:11px 12px}
+.rrow.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{text-align:left;font-weight:400;color:var(--text-2);font-size:13px;padding:11px 14px;border-bottom:1px solid var(--border)}
+.tbl td{padding:12px 14px;border-bottom:1px solid var(--border);font-size:14px;vertical-align:middle}
+.tbl tr:last-child td{border-bottom:0}
+.code{font-family:"IBM Plex Mono",monospace;font-size:12.5px;background:var(--surface-deep);border:1px solid var(--border);border-radius:6px;padding:1px 6px}
+.field{display:flex;flex-direction:column;gap:7px}
+.field label{font-size:14px;font-weight:500}
+.inp{height:42px;border:1px solid var(--border-strong);border-radius:10px;background:var(--surface-deep);display:flex;align-items:center;padding:0 13px;font-size:14.5px;color:var(--text);gap:10px}
+.inp.focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.inp.err{border-color:var(--warn);box-shadow:0 0 0 3px var(--warn-bg)}
+.inp .ph{color:var(--text-3)}
+.caret{width:2px;height:18px;background:var(--accent);display:inline-block}
+.cb{width:20px;height:20px;border-radius:6px;border:1px solid var(--border-strong);background:var(--surface-deep);display:flex;align-items:center;justify-content:center;flex:none}
+.cb.on{background:var(--accent);border-color:var(--accent);color:#0D1117}
+
+/* dialogs */
+.scrim{position:absolute;inset:0;background:var(--overlay);display:flex;align-items:center;justify-content:center;z-index:5}
+.dim{filter:blur(2.5px);opacity:.75}
+.dlg{width:520px;background:var(--surface);border:1px solid var(--border-strong);border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.55);overflow:hidden}
+.dlg.danger{border-top:3px solid var(--stop)}
+.dlg-h{display:flex;gap:14px;align-items:flex-start;padding:22px 22px 0}
+.dlg-h h2{font-size:18px;font-weight:600}
+.dlg-b{padding:16px 22px 20px}
+.dlg-f{display:flex;justify-content:flex-end;gap:10px;align-items:center;padding:14px 22px;border-top:1px solid var(--border)}
+.dicon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none;background:var(--stop-bg);border:1px solid var(--stop-border);color:#F87171}
+.step{display:flex;gap:12px;align-items:flex-start;padding:7px 0}
+.sicon{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none;margin-top:1px}
+.s-ok{background:var(--ok-bg);border:1px solid var(--ok-border);color:var(--ok-text)}
+.s-run{border:2px solid var(--info);border-right-color:transparent}
+.s-todo{border:1px dashed var(--border-strong)}
+.s-fail{background:var(--stop-bg);border:1px solid var(--stop-border);color:#F87171}
+.slog{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--text-2);background:var(--surface-deep);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:7px}
+
+
+/* phone */
+.phone{width:390px;min-height:844px;background:var(--bg);display:flex;flex-direction:column;position:relative}
+.ptop{height:66px;flex:none;display:flex;align-items:center;gap:12px;padding:0 14px 0 16px;border-bottom:1px solid var(--border);background:var(--topbar)}
+.ptop .t{font-size:17px;font-weight:600;display:flex;align-items:center;gap:4px;line-height:1.25}
+.ptop .s{font-size:12px;color:var(--text-2);display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden}
+.ptop .stopall{height:38px;padding:0 12px;font-size:14.5px;gap:6px}
+.pbody{padding:14px;display:flex;flex-direction:column;gap:12px}
+.ptab{margin-top:auto;flex:none;display:flex;border-top:1px solid var(--border);background:var(--topbar);padding:10px 0 22px}
+.ptab div{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:var(--text-2)}
+.ptab div.on{color:var(--text)} .ptab div.on svg{color:var(--accent)}
+.ptabs{display:flex;gap:6px;overflow:hidden;margin:0 -14px;padding:0 14px}
+.ptabs span{flex:none;display:flex;align-items:center;gap:6px;height:36px;padding:0 13px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--text-2);font-size:13.5px}
+.ptabs span.on{background:var(--accent-soft);border-color:var(--accent-border);color:var(--text)}
+.ptabs span.on svg{color:var(--accent)}
+.bigstop{width:100%;height:50px;font-size:16.5px;border-radius:14px}
+.pscrim{position:absolute;left:0;right:0;top:66px;bottom:0;background:var(--overlay);z-index:5}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:6}
+.sheet .grab{position:absolute;top:8px;left:50%;width:40px;height:5px;margin-left:-20px;border-radius:3px;background:var(--border-strong);z-index:1}
+.sheet .dlg{width:auto!important;border-radius:22px 22px 0 0;border-bottom:0;box-shadow:0 -14px 40px rgba(0,0,0,.45)}
+.sheet .dlg-h{padding:26px 18px 0}
+.sheet .dlg-b{padding:14px 18px 16px}
+.sheet .dlg-f{flex-direction:column-reverse;align-items:stretch;gap:8px;padding:12px 18px 30px}
+.sheet .dlg-f .btn{width:100%;height:46px;font-size:15px}
+.sheet .dlg-f>.grow,.sheet .dlg-f>.help{display:none}
+.prow{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)}
+.prow:last-child{border-bottom:0}
+.ph2{font-size:20px;font-weight:600}
+html,body{width:390px;min-height:844px}</style></head><body><div class="phone" style="height:844px;overflow:hidden"><div class="ptop"><div class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="12" r="3.2" fill="#E8AC65"/><circle cx="5" cy="5" r="2.2" fill="currentColor"/><circle cx="19" cy="5" r="2.2" fill="currentColor"/><circle cx="5" cy="19" r="2.2" fill="currentColor"/><circle cx="19" cy="19" r="2.2" fill="currentColor"/></svg></div><div class="grow"><div class="t">Fleet</div><div class="s"><span class="dot"></span>Hub connected · no robots yet</div></div><span class="btn stop stopall"><svg class="i " width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2.586 16.726A2 2 0 0 1 2 15.312V8.688a2 2 0 0 1 .586-1.414l4.688-4.688A2 2 0 0 1 8.688 2h6.624a2 2 0 0 1 1.414.586l4.688 4.688A2 2 0 0 1 22 8.688v6.624a2 2 0 0 1-.586 1.414l-4.688 4.688a2 2 0 0 1-1.414.586H8.688a2 2 0 0 1-1.414-.586z" /></svg>Stop all</span></div><div class="dim col" style="flex:1;overflow:hidden"><div class="pbody"><div class="row gap8"><div class="grow"><div class="row gap8"><span class="ph2">Robots</span><span class="help"><svg class="i " width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" />
+  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+  <path d="M12 17h.01" /></svg></span></div><div class="sub">No robots on this hub yet · up to 4</div></div></div><div style="border:1px dashed var(--border-strong);border-radius:16px;padding:34px 18px 22px;display:flex;flex-direction:column;align-items:center;text-align:center"><div class="mg lg"><svg class="i " width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8" />
+  <rect width="16" height="12" x="4" y="8" rx="2" />
+  <path d="M2 14h2" />
+  <path d="M20 14h2" />
+  <path d="M15 13v2" />
+  <path d="M9 13v2" /></svg></div><div style="font-size:17px;font-weight:600;margin-top:16px">No robots yet. Press Add robot to set one up.</div><p class="muted" style="margin-top:8px;font-size:14px">The hub installs its program on the robot for you. It takes a few minutes the first time.</p><div class="card" style="width:100%;padding:14px 16px;margin-top:20px;text-align:left"><div class="muted" style="font-size:13px">What you need</div><div class="row gap10" style="margin-top:10px;align-items:flex-start;font-size:13.5px"><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-2)"><path d="M12 20h.01" />
+  <path d="M2 8.82a15 15 0 0 1 20 0" />
+  <path d="M5 12.859a10 10 0 0 1 14 0" />
+  <path d="M8.5 16.429a5 5 0 0 1 7 0" /></svg><span>The robot switched on and on the lab Wi-Fi</span></div><div class="row gap10" style="margin-top:10px;align-items:flex-start;font-size:13.5px"><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-2)"><line x1="4" x2="20" y1="9" y2="9" />
+  <line x1="4" x2="20" y1="15" y2="15" />
+  <line x1="10" x2="8" y1="3" y2="21" />
+  <line x1="16" x2="14" y1="3" y2="21" /></svg><span>Its IP address, e.g. <span class="mono">192.168.149.1</span></span></div><div class="row gap10" style="margin-top:10px;align-items:flex-start;font-size:13.5px"><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-2)"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z" />
+  <circle cx="16.5" cy="7.5" r=".5" fill="currentColor" /></svg><span>Its password (used once, not saved)</span></div></div><span class="btn primary" style="margin-top:20px;height:46px;width:100%;font-size:15px"><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14" />
+  <path d="M12 5v14" /></svg>Add robot</span></div></div><div class="ptab"><div class="on"><svg class="i " width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1" />
+  <rect width="7" height="7" x="14" y="3" rx="1" />
+  <rect width="7" height="7" x="14" y="14" rx="1" />
+  <rect width="7" height="7" x="3" y="14" rx="1" /></svg>Fleet</div><div class=""><svg class="i " width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+  <path d="M3 3v5h5" />
+  <path d="M12 7v5l4 2" /></svg>History</div><div class=""><svg class="i " width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" /></svg>Health</div><div class=""><svg class="i " width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" />
+  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+  <path d="M12 17h.01" /></svg>Help</div></div></div><div class="pscrim"></div><div class="sheet"><div class="grab"></div><div class="dlg" style="width:520px"><div class="dlg-h"><div class="grow"><div class="row gap12" style="align-items:flex-start"><span class="pill p-fail"><svg class="i " width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" />
+  <path d="m15 9-6 6" />
+  <path d="m9 9 6 6" /></svg>Failed</span><div><h2>Installing the robot</h2><p class="muted" style="margin-top:4px">Adding <span class="mono">pi@192.168.149.1</span> · name picked for you: <span class="mono">masterpi-01</span></p></div></div></div><span style="color:var(--text-2)"><svg class="i " width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" />
+  <path d="m6 6 12 12" /></svg></span></div><div class="dlg-b"><div class="step"><span class="sicon s-fail"><svg class="i " width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18" />
+  <path d="m6 6 12 12" /></svg></span><div class="grow" style="font-size:14.5px">Connecting to pi@192.168.149.1<div class="slog">ssh pi@192.168.149.1: Permission denied (publickey,password)</div></div><span class="faint num" style="font-size:12.5px"></span></div><div class="step"><span class="sicon s-todo"></span><div class="grow" style="font-size:14.5px"><span class="muted">Checking the robot</span></div><span class="faint num" style="font-size:12.5px"></span></div><div class="step"><span class="sicon s-todo"></span><div class="grow" style="font-size:14.5px"><span class="muted">Installing the robot's packages</span><div class="muted" style="font-size:13px">The first time takes a few minutes</div></div><span class="faint num" style="font-size:12.5px"></span></div><div class="step"><span class="sicon s-todo"></span><div class="grow" style="font-size:14.5px"><span class="muted">Copying the agent</span></div><span class="faint num" style="font-size:12.5px"></span></div><div class="step"><span class="sicon s-todo"></span><div class="grow" style="font-size:14.5px"><span class="muted">Setting it to start on every boot</span></div><span class="faint num" style="font-size:12.5px"></span></div><div class="step"><span class="sicon s-todo"></span><div class="grow" style="font-size:14.5px"><span class="muted">Waiting for the robot to connect to the hub</span></div><span class="faint num" style="font-size:12.5px"></span></div><div class="note bad" style="margin-top:12px"><svg class="i " width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" />
+  <path d="m15 9-6 6" />
+  <path d="m9 9 6 6" /></svg><div><b style="font-weight:600">The robot rejected that username or password.</b><div class="muted">Nothing was changed on the robot. Check the password and try again.</div></div></div></div><div class="dlg-f"><span class="btn">Close</span><span class="btn primary"><svg class="i " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+  <path d="M21 3v5h-5" />
+  <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+  <path d="M8 16H3v5" /></svg>Try again</span></div></div></div></div></body></html>

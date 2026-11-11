@@ -191,12 +191,34 @@ svg.i{display:inline-block;flex:none;vertical-align:middle}
 .s-fail{background:var(--stop-bg);border:1px solid var(--stop-border);color:#F87171}
 .slog{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--text-2);background:var(--surface-deep);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:7px}
 
+
 /* phone */
 .phone{width:390px;min-height:844px;background:var(--bg);display:flex;flex-direction:column;position:relative}
-.ptop{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border);background:var(--topbar)}
-.ptab{margin-top:auto;display:flex;border-top:1px solid var(--border);background:var(--topbar);padding:10px 0 18px}
+.ptop{height:66px;flex:none;display:flex;align-items:center;gap:12px;padding:0 14px 0 16px;border-bottom:1px solid var(--border);background:var(--topbar)}
+.ptop .t{font-size:17px;font-weight:600;display:flex;align-items:center;gap:4px;line-height:1.25}
+.ptop .s{font-size:12px;color:var(--text-2);display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden}
+.ptop .stopall{height:38px;padding:0 12px;font-size:14.5px;gap:6px}
+.pbody{padding:14px;display:flex;flex-direction:column;gap:12px}
+.ptab{margin-top:auto;flex:none;display:flex;border-top:1px solid var(--border);background:var(--topbar);padding:10px 0 22px}
 .ptab div{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:var(--text-2)}
 .ptab div.on{color:var(--text)} .ptab div.on svg{color:var(--accent)}
+.ptabs{display:flex;gap:6px;overflow:hidden;margin:0 -14px;padding:0 14px}
+.ptabs span{flex:none;display:flex;align-items:center;gap:6px;height:36px;padding:0 13px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--text-2);font-size:13.5px}
+.ptabs span.on{background:var(--accent-soft);border-color:var(--accent-border);color:var(--text)}
+.ptabs span.on svg{color:var(--accent)}
+.bigstop{width:100%;height:50px;font-size:16.5px;border-radius:14px}
+.pscrim{position:absolute;left:0;right:0;top:66px;bottom:0;background:var(--overlay);z-index:5}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:6}
+.sheet .grab{position:absolute;top:8px;left:50%;width:40px;height:5px;margin-left:-20px;border-radius:3px;background:var(--border-strong);z-index:1}
+.sheet .dlg{width:auto!important;border-radius:22px 22px 0 0;border-bottom:0;box-shadow:0 -14px 40px rgba(0,0,0,.45)}
+.sheet .dlg-h{padding:26px 18px 0}
+.sheet .dlg-b{padding:14px 18px 16px}
+.sheet .dlg-f{flex-direction:column-reverse;align-items:stretch;gap:8px;padding:12px 18px 30px}
+.sheet .dlg-f .btn{width:100%;height:46px;font-size:15px}
+.sheet .dlg-f>.grow,.sheet .dlg-f>.help{display:none}
+.prow{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)}
+.prow:last-child{border-bottom:0}
+.ph2{font-size:20px;font-weight:600}
 html,body{width:1440px;min-height:990px}</style></head><body><div class="app" style="min-height:990px"><aside class="side"><div class="brand"><div class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="12" r="3.2" fill="#E8AC65"/><circle cx="5" cy="5" r="2.2" fill="currentColor"/><circle cx="19" cy="5" r="2.2" fill="currentColor"/><circle cx="5" cy="19" r="2.2" fill="currentColor"/><circle cx="19" cy="19" r="2.2" fill="currentColor"/></svg></div><div><b>Swarm Hub</b><span>Lab hub · Pi 5</span></div></div><nav class="nav"><a class="on"><svg class="i " width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1" />
   <rect width="7" height="7" x="14" y="3" rx="1" />
   <rect width="7" height="7" x="14" y="14" rx="1" />

@@ -1,7 +1,8 @@
 """Builds the Swarm Hub design mockups as self-contained HTML, one file per screen.
 
 Rebuilt from the approved PNG screenshots (design/swarm-hub-screens-v2.zip), robot view "Set A":
-the robot list can be hidden and shown (screens 06 and 34). The older split view (09, 09b) is left out.
+the robot list can be hidden and shown (screens 06 and 09). The older split view is left out.
+Every screen also has a phone version (phone-01 to phone-31, 390 px wide); see the phone section.
 
 Each file has its CSS inlined and icons as inline SVG, so it opens on its own and imports into Figma.
 Fonts: Inter (stand-in for SF Pro) and IBM Plex Mono. Run from anywhere:
@@ -213,12 +214,6 @@ svg.i{display:inline-block;flex:none;vertical-align:middle}
 .s-fail{background:var(--stop-bg);border:1px solid var(--stop-border);color:#F87171}
 .slog{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--text-2);background:var(--surface-deep);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:7px}
 
-/* phone */
-.phone{width:390px;min-height:844px;background:var(--bg);display:flex;flex-direction:column;position:relative}
-.ptop{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border);background:var(--topbar)}
-.ptab{margin-top:auto;display:flex;border-top:1px solid var(--border);background:var(--topbar);padding:10px 0 18px}
-.ptab div{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:var(--text-2)}
-.ptab div.on{color:var(--text)} .ptab div.on svg{color:var(--accent)}
 """
 
 FONTS = ('<link rel="preconnect" href="https://fonts.googleapis.com">'
@@ -514,7 +509,7 @@ def drive_card(mode="you", lat="18 ms"):
 ARM = [("Base", 1500), ("Shoulder", 1320), ("Elbow", 1710), ("Wrist", 1450), ("Gripper", 1100)]
 
 
-def arm_card(mode="you"):
+def arm_card(mode="you", stack=False):
     head = f'<div class="card-h">{icon("hand", 18)}<h3>Arm</h3>{helpdot()}<div class="grow"></div>'
     if mode == "watch":
         cells = "".join(f'<div class="grow"><div class="lbl" style="font-size:13px;color:var(--text)">{n}</div>'
@@ -537,9 +532,14 @@ def arm_card(mode="you"):
                     f'<b class="mono num" style="font-weight:500;width:64px;text-align:right">{v} µs</b></span></div>'
                     f'<div class="slider" style="margin-top:8px"><div class="tr"></div><div class="fill" style="width:{p:.1f}%"></div>'
                     f'<div class="th" style="left:{p:.1f}%"></div></div></div>')
+    release = f'<span class="btn danger-soft">{icon("hand", 16)}Release (go limp)</span>'
+    if stack:   # phone: full-width buttons, no Close (the tab row switches away)
+        btns = f'<div class="col gap8" style="margin-top:6px">{stopbtn("Stop (arm holds)", cls="bigstop")}{release}</div>'
+    else:
+        btns = (f'<div class="row gap10" style="margin-top:6px">{stopbtn("Stop (arm holds)")}{release}'
+                f'<div class="grow"></div><span class="btn ghost">Close</span></div>')
     return (f'<div class="card">{head}<span class="faint" style="font-size:12.5px">Limits 500–2500 µs</span></div>'
-            f'<div class="card-b">{"".join(rows)}<div class="row gap10" style="margin-top:6px">{stopbtn("Stop (arm holds)")}'
-            f'<span class="btn danger-soft">{icon("hand", 16)}Release (go limp)</span><div class="grow"></div><span class="btn ghost">Close</span></div>'
+            f'<div class="card-b">{"".join(rows)}{btns}'
             f'<div class="note" style="margin-top:14px">{icon("info", 16)}<span>Nothing is sent until you move a slider. A joint\'s first move after the robot restarts jumps straight to the slider, so start close to where it really is.</span></div></div></div>')
 
 
@@ -602,7 +602,11 @@ def terminal_card(empty=False):
     if empty:
         body = '<div class="mono faint" style="font-size:12.5px;height:120px">Nothing run yet in this session.</div>'
     else:
-        body = ('<div class="mono" style="font-size:12.5px;line-height:1.75;color:var(--text)">'
+        body = '<div class="mono" style="font-size:12.5px;line-height:1.75;color:var(--text)">' + TERM_OUT + '</div>'
+    return _terminal_tail(body, border)
+
+
+TERM_OUT = (
                 '<span class="faint">~/swarm-agent $</span> journalctl -u swarm-agent -n 30<br>'
                 'Nov 10 09:15:41 masterpi-01 robot_agent.py[812]: [robot]<br>&nbsp;&nbsp;gyro calibrated: rotation is 0, 0, 0<br>'
                 'Nov 10 09:15:44 masterpi-01 robot_agent.py[812]: [robot]<br>&nbsp;&nbsp;connected to hub 192.168.50.2:8765<br>'
@@ -612,7 +616,10 @@ def terminal_card(empty=False):
                 '60: -- -- -- -- -- -- -- -- 68 -- -- -- -- -- -- --<br>70: -- -- -- -- -- -- -- --<br>'
                 '<span class="faint">exit code 0</span><br><br>'
                 '<span class="faint">~/swarm-agent $</span> cat gyro.log<br>cat: gyro.log: No such file or directory<br>'
-                '<span style="color:var(--warn-text)">exit code 1</span></div>')
+                '<span style="color:var(--warn-text)">exit code 1</span>')
+
+
+def _terminal_tail(body, border):
     return (f'<div class="card" style="{border}"><div class="card-h" style="background:var(--stop-bg);{border};border-radius:14px 14px 0 0">'
             f'{icon("terminal", 17, color="#F87171")}<b style="font-weight:600">Terminal on Clanker</b>'
             f'<span class="muted" style="font-size:13px">runs as pi · every command is logged</span><div class="grow"></div>'
@@ -624,17 +631,24 @@ def terminal_card(empty=False):
             f'<p class="muted" style="font-size:13px;padding:10px 16px 14px;border-top:1px solid var(--border)">One command at a time, stops after 30 seconds. Programs that need typing (nano, top) won\'t work.</p></div>')
 
 
+INFO_ROWS = [("Robot type", '<span class="mono">masterpi</span>'), ("Address", "192.168.50.11"),
+             ("Robot's own name", '<span class="mono">masterpi-01</span>'), ("Installed by this hub", "CHECK Yes"),
+             ("Added on", "14 Oct 2026, 16:20"), ("Last updated", 'Today, 09:15 <span class="muted">by asmaa</span>')]
+INFO_CAPS = [("move", "Wheels"), ("camera", "Camera"), ("hand", "Arm · 5 joints"), ("radar", "Distance"), ("rotate-3d", "Gyro")]
+INFO_SENSORS = ("distance_cm", "rot_x_deg", "rot_y_deg", "rot_z_deg", "gyro_x_dps", "gyro_y_dps", "gyro_z_dps")
+
+
+def _info_value(v):
+    return v.replace("CHECK", icon("check", 15))
+
+
 def info_card():
-    rows = [("Robot type", '<span class="mono">masterpi</span>'), ("Address", "192.168.50.11"),
-            ("Robot's own name", '<span class="mono">masterpi-01</span>'), ("Installed by this hub", f'{icon("check", 15)} Yes'),
-            ("Added on", "14 Oct 2026, 16:20"), ("Last updated", 'Today, 09:15 <span class="muted">by asmaa</span>')]
-    tr = "".join(f'<div class="row" style="padding:11px 0;border-bottom:1px solid var(--border)"><span class="muted" style="width:160px">{k}</span><span class="row gap6">{v}</span></div>' for k, v in rows)
-    caps = "".join(f'<span class="pill sm p-ctl" style="padding-left:8px">{icon(ic, 13)}{t}</span>' for ic, t in
-                   [("move", "Wheels"), ("camera", "Camera"), ("hand", "Arm · 5 joints"), ("radar", "Distance"), ("rotate-3d", "Gyro")])
+    rows = INFO_ROWS
+    tr = "".join(f'<div class="row" style="padding:11px 0;border-bottom:1px solid var(--border)"><span class="muted" style="width:160px">{k}</span><span class="row gap6">{_info_value(v)}</span></div>' for k, v in rows)
+    caps = "".join(f'<span class="pill sm p-ctl" style="padding-left:8px">{icon(ic, 13)}{t}</span>' for ic, t in INFO_CAPS)
     joints = "".join(f'<div class="grow" style="padding:9px 11px;border-right:1px solid var(--border)"><div class="mono" style="font-size:12.5px">{j}</div>'
                      f'<div class="muted num" style="font-size:12.5px">500–2500</div></div>' for j in ("base", "shoulder", "elbow", "wrist", "gripper"))
-    sens = "".join(f'<span class="code" style="font-size:12px">{s}</span>' for s in
-                   ("distance_cm", "rot_x_deg", "rot_y_deg", "rot_z_deg", "gyro_x_dps", "gyro_y_dps", "gyro_z_dps"))
+    sens = "".join(f'<span class="code" style="font-size:12px">{s}</span>' for s in INFO_SENSORS)
     return (f'<div class="card"><div class="card-h">{icon("info", 18)}<h3>Info</h3><div class="grow"></div>'
             f'<span class="btn sm">{icon("download", 15)}Update…</span><span class="btn sm danger-soft">{icon("trash-2", 15)}Remove…</span></div>'
             f'<div class="card-b" style="padding-top:4px">{tr}<div class="muted" style="font-size:13px;margin:12px 0 8px">What it can do</div>'
@@ -820,21 +834,32 @@ def spark(points, color="var(--text-3)", fill=False):
     return f'<svg width="240" height="32" viewBox="0 0 240 32">{f}<polyline points="{line}" fill="none" stroke="{color}" stroke-width="1.6"/></svg>'
 
 
-def health_page():
-    tiles = [("CPU temperature", "61 °C", "the Pi slows down above 75 °C", True), ("CPU load", "0.42", "1-minute average", False),
+HEALTH_TILES = [("CPU temperature", "61 °C", "the Pi slows down above 75 °C", True), ("CPU load", "0.42", "1-minute average", False),
              ("Memory used", "38%", "of the Pi's memory", False), ("Disk free", "21 GB", "on the SD card", False),
              ("Running for", "3 days 4 h", "since 7 Nov, 10:08", False), ("Version", "1.0.0", "hub software", False)]
+
+
+def temp_gauge():
+    return ('<div class="slider" style="margin-top:12px;height:10px"><div class="tr" style="height:5px"></div><div class="fill" style="width:68%;height:5px;background:var(--text-2)"></div>'
+            '<div style="position:absolute;left:83%;width:2px;height:12px;background:var(--text-2)"></div></div>'
+            '<div class="row faint num" style="font-size:11.5px;margin-top:4px"><span>0</span><div class="grow"></div><span style="margin-right:22px">75</span><span>90 °C</span></div>')
+
+
+def health_robots():
+    return [("clanker", "18 ms", spark([2, 2, 3, 2, 2, 3, 2, 2, 2, 3, 2, 2]), "0", "now"),
+            ("rover", "24 ms", spark([2, 2, 3, 2, 3, 2, 8, 3, 2, 2, 3, 2]), "1", "now"),
+            ("scout", "212 ms", spark([4, 6, 5, 12, 16, 10, 7, 20, 22, 14, 18, 22, 17, 15, 19, 20, 18], "var(--warn)", True), "7", "6 s ago"),
+            ("vex", "—", None, "2", "3 h ago")]
+
+
+def health_page():
+    tiles = HEALTH_TILES
     t = []
     for name, val, sub, gauge in tiles:
-        g = ('<div class="slider" style="margin-top:12px;height:10px"><div class="tr" style="height:5px"></div><div class="fill" style="width:68%;height:5px;background:var(--text-2)"></div>'
-             '<div style="position:absolute;left:83%;width:2px;height:12px;background:var(--text-2)"></div></div>'
-             '<div class="row faint num" style="font-size:11.5px;margin-top:4px"><span>0</span><div class="grow"></div><span style="margin-right:22px">75</span><span>90 °C</span></div>') if gauge else ""
+        g = temp_gauge() if gauge else ""
         t.append(f'<div class="card" style="padding:16px;flex:{1.5 if gauge else 1};background:var(--surface-deep)"><div class="muted" style="font-size:13px">{name}</div>'
                  f'<div class="num" style="font-size:26px;font-weight:500;margin:6px 0 4px">{val}</div><div class="muted" style="font-size:12.5px">{sub}</div>{g}</div>')
-    robots = [("clanker", "18 ms", spark([2, 2, 3, 2, 2, 3, 2, 2, 2, 3, 2, 2]), "0", "now"),
-              ("rover", "24 ms", spark([2, 2, 3, 2, 3, 2, 8, 3, 2, 2, 3, 2]), "1", "now"),
-              ("scout", "212 ms", spark([4, 6, 5, 12, 16, 10, 7, 20, 22, 14, 18, 22, 17, 15, 19, 20, 18], "var(--warn)", True), "7", "6 s ago"),
-              ("vex", "—", None, "2", "3 h ago")]
+    robots = health_robots()
     rows = []
     for k, lat, sp, rec, seen in robots:
         r = ROBOTS[k]
@@ -855,8 +880,7 @@ def health_page():
             f'<table class="tbl"><tr><th>Robot</th><th>Status</th><th>Latency now</th><th>Last hour</th><th>Reconnects (24 h)</th><th>Last seen</th></tr>{"".join(rows)}</table></div>')
 
 
-def help_page():
-    arts = [("rocket", "Getting started", "Sign in, find your robot on Fleet, open it and take control.", "2 min read"),
+HELP_ARTS = [("rocket", "Getting started", "Sign in, find your robot on Fleet, open it and take control.", "2 min read"),
             ("plus", "Adding a robot", "What you need, and what the hub does during Install.", "3 min read"),
             ("wifi-off", "When a robot won't connect", "Unresponsive, Offline and the usual Wi-Fi causes.", "2 min read"),
             ("gamepad-2", "Manual driving", "Hold a button or key to move; let go and the robot stops.", "2 min read"),
@@ -864,6 +888,10 @@ def help_page():
             ("rotate-3d", "Sensors and the gyro", "Distance up to 2 m, rotation and turn speed, Calibrate gyro.", "3 min read"),
             ("keyboard", "Keyboard shortcuts", "W A S D to move, Q E to turn, Space to stop, Esc Esc for Stop all.", "1 min read"),
             ("octagon", "Safety rules", "Stop always works. Remote driving only while someone is in the lab.", "2 min read")]
+
+
+def help_page():
+    arts = HELP_ARTS
     cards = "".join(f'<div class="card" style="padding:16px 18px"><span class="mg" style="width:32px;height:32px">{icon(ic, 16)}</span>'
                     f'<div style="font-size:16px;font-weight:600;margin-top:14px">{t}</div><p class="muted" style="margin-top:6px;font-size:14px;min-height:40px">{d}</p>'
                     f'<div class="faint" style="font-size:13px;margin-top:10px">{rt}</div></div>' for ic, t, d, rt in arts)
@@ -890,6 +918,11 @@ def help_page():
 
 
 def help_article():
+    art, side = help_article_parts()
+    return f'<div class="row gap20" style="align-items:flex-start">{art}{side}</div>'
+
+
+def help_article_parts():
     def h(t):
         return f'<h3 style="font-size:16.5px;font-weight:600;margin:22px 0 8px">{t}</h3>'
     p = 'style="color:var(--text-2);font-size:15px;line-height:1.6"'
@@ -916,7 +949,7 @@ def help_article():
            f'<span class="muted" style="font-size:13.5px">Was this clear?</span><span class="btn sm">{icon("thumbs-up", 15)}Yes</span><span class="btn sm">{icon("thumbs-down", 15)}Not really</span></div></div>')
     side = (f'<div class="col gap16" style="width:300px"><div class="card" style="padding:14px 16px"><div class="muted" style="font-size:13px;margin-bottom:6px">Related</div>{rel}</div>'
             f'<div class="card" style="padding:14px 16px"><div class="muted" style="font-size:13px">Keys while you have control</div>{keys}</div></div>')
-    return f'<div class="row gap20" style="align-items:flex-start">{art}{side}</div>'
+    return art, side
 
 
 # ---------------------------------------------------------------- dialogs
@@ -1024,20 +1057,24 @@ def terminal_confirm_dialog():
 # ---------------------------------------------------------------- sign in
 
 def sign_in(error=False):
+    brand, card, note = sign_in_parts(error)
+    return (f'<div style="width:1440px;height:900px;background:radial-gradient(ellipse 700px 420px at 50% 22%,rgba(232,172,101,.06),transparent),var(--bg);'
+            f'display:flex;flex-direction:column;align-items:center;justify-content:center">{brand}{card}{note}</div>')
+
+
+def sign_in_parts(error=False):
     err = (f'<div class="note warn" style="margin-bottom:16px;align-items:center">{icon("triangle-alert", 17)}Wrong username or password.</div>' if error else "")
     user = '<div class="inp">asmaa</div>' if error else '<div class="inp focus">asmaa<span class="caret"></span></div>'
     pw = (f'<div class="inp err" style="letter-spacing:3px"><span class="grow">•••••••••</span>{icon("triangle-alert", 16, color="var(--text-2)")}</div>'
           f'<span class="muted" style="font-size:13px">Check your password and try again. After 5 wrong tries, sign-in pauses for a minute.</span>'
           if error else f'<div class="inp"><span class="ph grow">Password</span>{icon("eye", 16, color="var(--text-2)")}</div>')
-    return (f'<div style="width:1440px;height:900px;background:radial-gradient(ellipse 700px 420px at 50% 22%,rgba(232,172,101,.06),transparent),var(--bg);'
-            f'display:flex;flex-direction:column;align-items:center;justify-content:center">'
-            f'<div class="row gap12" style="margin-bottom:28px">{LOGO}<div><div style="font-size:22px;font-weight:600">Swarm Hub</div>'
-            f'<div class="muted" style="font-size:13px">Robot lab · sign in to continue</div></div></div>'
+    return (f'<div class="row gap12" style="margin-bottom:28px">{LOGO}<div><div style="font-size:22px;font-weight:600">Swarm Hub</div>'
+            f'<div class="muted" style="font-size:13px">Robot lab · sign in to continue</div></div></div>',
             f'<div class="card" style="width:400px;padding:28px;border-radius:18px"><div style="font-size:19px;font-weight:600">Sign in</div>'
             f'<p class="muted" style="margin:4px 0 22px">Use your hub login.</p>{err}<div class="field"><label>Username</label>{user}</div>'
             f'<div class="field" style="margin-top:16px"><label>Password</label>{pw}</div>'
-            f'<span class="btn primary" style="width:100%;height:44px;margin-top:22px;font-size:15px">Sign in</span></div>'
-            f'<p class="muted row gap8" style="margin-top:22px;font-size:13.5px">{icon("shield", 15)}Only team devices on our Tailscale network can open this page.</p></div>')
+            f'<span class="btn primary" style="width:100%;height:44px;margin-top:22px;font-size:15px">Sign in</span></div>',
+            f'<p class="muted row gap8" style="margin-top:22px;font-size:13.5px">{icon("shield", 15)}Only team devices on our Tailscale network can open this page.</p>')
 
 
 # ---------------------------------------------------------------- components sheet
@@ -1097,50 +1134,524 @@ def components_page():
 
 
 # ---------------------------------------------------------------- phone
+# Every desktop screen again at 390 px wide. Same data and parts; what changes on a phone:
+# the sidebar becomes a bottom tab bar, Stop all stays in the top bar on every screen,
+# the robot's tabs become a sideways-scrolling row, dialogs become bottom sheets,
+# the drive pad is for touch (no key letters) and the camera starts on Low · 5 fps.
 
-def phone_tabbar():
-    items = [("layout-grid", "Fleet", True), ("history", "History", False), ("activity", "Health", False), ("circle-help", "Help", False)]
-    return '<div class="ptab">' + "".join(f'<div class="{"on" if on else ""}">{icon(ic, 21)}{t}</div>' for ic, t, on in items) + "</div>"
+CSS += r"""
+/* phone */
+.phone{width:390px;min-height:844px;background:var(--bg);display:flex;flex-direction:column;position:relative}
+.ptop{height:66px;flex:none;display:flex;align-items:center;gap:12px;padding:0 14px 0 16px;border-bottom:1px solid var(--border);background:var(--topbar)}
+.ptop .t{font-size:17px;font-weight:600;display:flex;align-items:center;gap:4px;line-height:1.25}
+.ptop .s{font-size:12px;color:var(--text-2);display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden}
+.ptop .stopall{height:38px;padding:0 12px;font-size:14.5px;gap:6px}
+.pbody{padding:14px;display:flex;flex-direction:column;gap:12px}
+.ptab{margin-top:auto;flex:none;display:flex;border-top:1px solid var(--border);background:var(--topbar);padding:10px 0 22px}
+.ptab div{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:var(--text-2)}
+.ptab div.on{color:var(--text)} .ptab div.on svg{color:var(--accent)}
+.ptabs{display:flex;gap:6px;overflow:hidden;margin:0 -14px;padding:0 14px}
+.ptabs span{flex:none;display:flex;align-items:center;gap:6px;height:36px;padding:0 13px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--text-2);font-size:13.5px}
+.ptabs span.on{background:var(--accent-soft);border-color:var(--accent-border);color:var(--text)}
+.ptabs span.on svg{color:var(--accent)}
+.bigstop{width:100%;height:50px;font-size:16.5px;border-radius:14px}
+.pscrim{position:absolute;left:0;right:0;top:66px;bottom:0;background:var(--overlay);z-index:5}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:6}
+.sheet .grab{position:absolute;top:8px;left:50%;width:40px;height:5px;margin-left:-20px;border-radius:3px;background:var(--border-strong);z-index:1}
+.sheet .dlg{width:auto!important;border-radius:22px 22px 0 0;border-bottom:0;box-shadow:0 -14px 40px rgba(0,0,0,.45)}
+.sheet .dlg-h{padding:26px 18px 0}
+.sheet .dlg-b{padding:14px 18px 16px}
+.sheet .dlg-f{flex-direction:column-reverse;align-items:stretch;gap:8px;padding:12px 18px 30px}
+.sheet .dlg-f .btn{width:100%;height:46px;font-size:15px}
+.sheet .dlg-f>.grow,.sheet .dlg-f>.help{display:none}
+.prow{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)}
+.prow:last-child{border-bottom:0}
+.ph2{font-size:20px;font-weight:600}
+"""
+
+PHONE_TABS = [("fleet", "layout-grid", "Fleet"), ("history", "history", "History"), ("health", "activity", "Health"),
+              ("help", "circle-help", "Help")]
 
 
-def phone_top(title, back=False):
-    lead = icon("chevron-left", 20, color="var(--text-2)") if back else LOGO
-    return (f'<div class="ptop">{lead}<div class="grow"><div style="font-size:17px;font-weight:600">{title}</div>'
-            f'<div class="muted row gap6" style="font-size:12px"><span class="dot"></span>Hub connected · 3 of 4 online</div></div>'
-            f'{stopbtn("Stop all", None, "stopall", size=18)}</div>')
+def phone_tabbar(active="fleet"):
+    return '<div class="ptab">' + "".join(f'<div class="{"on" if k == active else ""}">{icon(ic, 21)}{t}</div>'
+                                          for k, ic, t in PHONE_TABS) + "</div>"
 
 
-def phone_fleet():
-    cards = []
-    for k, r in ROBOTS.items():
-        pills = status_pill(r["status"], True) + (moving_pill(True) if r["moving"] else "") + ctrl_pill(r["ctrl"], True)
-        info = f'{r["seen_short"]} · {r["lat"]}' + (f' · {r["dist"]} cm' if r["dist"] else "")
-        cards.append(f'<div class="card" style="padding:14px"><div class="row gap12" style="align-items:flex-start"><span class="mg">{r["mg"]}</span>'
-                     f'<div class="grow"><div class="row gap8"><span style="font-size:15px;font-weight:500">{r["name"]}</span><span class="mono faint" style="font-size:12px">{r["host"]}</span></div>'
-                     f'<div class="row gap6" style="flex-wrap:wrap;margin-top:7px">{pills}</div></div></div>'
-                     f'<div class="row gap8" style="margin-top:12px"><span class="muted grow" style="font-size:12.5px">{info}</span><span class="btn sm">Open</span>'
-                     f'{stopbtn(off=r["status"] == "offline", cls="sm")}</div></div>')
-    toast = (f'<div class="card row gap12" style="padding:12px 14px;background:var(--surface-raised)"><span class="mg" style="width:32px;height:32px">{icon("lock", 15)}</span>'
+PHONE_SUBS = {
+    "ok": '<span class="dot"></span>Hub connected · 3 of 4 online',
+    "none": '<span class="dot"></span>Hub connected · no robots yet',
+    "one": '<span class="dot"></span>Hub connected · 1 of 1 online',
+}
+
+
+def phone_top(title, back=False, sub="ok", stop_all=True):
+    lead = icon("chevron-left", 22, color="var(--text-2)") if back else LOGO
+    if sub == "down":
+        s = (f'<span style="color:var(--warn-text);display:flex;align-items:center;gap:5px">'
+             f'{icon("triangle-alert", 13)}Hub unreachable · reconnecting…</span>')
+    else:
+        s = PHONE_SUBS.get(sub, sub)
+    sa = stopbtn("Stop all", None, "stopall", size=17) if stop_all else ""
+    return f'<div class="ptop">{lead}<div class="grow"><div class="t">{title}</div><div class="s">{s}</div></div>{sa}</div>'
+
+
+def phone(title, body, back=False, sub="ok", active="fleet", overlay="", stop_all=True, tabbar=True):
+    """A phone screen. With an overlay (a bottom sheet) the page dims, but the top bar with Stop all stays sharp."""
+    top = phone_top(title, back, sub, stop_all)
+    tb = phone_tabbar(active) if tabbar else ""
+    if not overlay:
+        return f'<div class="phone">{top}<div class="pbody">{body}</div>{tb}</div>'
+    return (f'<div class="phone" style="height:844px;overflow:hidden">{top}'
+            f'<div class="dim col" style="flex:1;overflow:hidden"><div class="pbody">{body}</div>{tb}</div>'
+            f'<div class="pscrim"></div><div class="sheet"><div class="grab"></div>{overlay}</div></div>')
+
+
+def phead(title, sub=None, right=""):
+    s = f'<div class="sub">{sub}</div>' if sub else ""
+    return f'<div class="row gap8"><div class="grow"><div class="row gap8"><span class="ph2">{title}</span>{helpdot()}</div>{s}</div>{right}</div>'
+
+
+def pcard(title, ic, inner, right="", pad=True):
+    head = (f'<div class="row gap8" style="padding:13px 14px;border-bottom:1px solid var(--border)">{icon(ic, 17)}'
+            f'<b style="font-size:15px;font-weight:600">{title}</b>{helpdot()}<div class="grow"></div>{right}</div>')
+    return f'<div class="card">{head}<div style="{"padding:12px 14px" if pad else ""}">{inner}</div></div>'
+
+
+# ---- sign in
+
+def p_sign_in(error=False):
+    brand, card, note = sign_in_parts(error)
+    card = card.replace("width:400px;padding:28px", "width:100%;padding:22px")
+    return (f'<div class="phone" style="height:844px;padding:0 16px;align-items:center;justify-content:center;'
+            f'background:radial-gradient(ellipse 340px 300px at 50% 20%,rgba(232,172,101,.07),transparent),var(--bg)">'
+            f'{brand}{card}{note.replace("margin-top:22px", "margin-top:22px;text-align:center;justify-content:center")}</div>')
+
+
+# ---- fleet
+
+def p_fleet_card(k, stale=False):
+    r = ROBOTS[k]
+    pills = status_pill(r["status"], True) + (moving_pill(True) if r["moving"] else "") + ctrl_pill(r["ctrl"], True)
+    info = f'{r["seen_short"]} · {r["lat"]}' + (f' · {r["dist"]} cm' if r["dist"] else "")
+    if stale:
+        info = f'<span style="color:var(--warn-text);display:inline-flex;gap:4px;align-items:center">{icon("clock", 12)}24 s ago</span> · {info}'
+    return (f'<div class="card" style="padding:14px"><div class="row gap12" style="align-items:flex-start"><span class="mg">{r["mg"]}</span>'
+            f'<div class="grow"><div class="row gap8"><span style="font-size:15px;font-weight:500">{r["name"]}</span><span class="mono faint" style="font-size:12px">{r["host"]}</span></div>'
+            f'<div class="row gap6" style="flex-wrap:wrap;margin-top:7px;{"opacity:.75" if stale else ""}">{pills}</div></div></div>'
+            f'<div class="row gap8" style="margin-top:12px"><span class="muted grow" style="font-size:12.5px">{info}</span><span class="btn sm">Open</span>'
+            f'{stopbtn(off=r["status"] == "offline", cls="sm")}</div></div>')
+
+
+def p_fleet(stale=False, toast=True):
+    banner = ""
+    if stale:
+        banner = (f'<div class="note warn" style="align-items:flex-start">{icon("triangle-alert", 18)}<div class="grow">'
+                  f'<b style="font-weight:600">Can\'t reach the hub. Reconnecting…</b>'
+                  f'<div class="muted" style="font-size:12.5px;margin-top:2px">Everything below may be out of date. Last update 24 s ago. '
+                  f'If you were driving, the hub stops that robot when your connection drops.</div>'
+                  f'<div class="row gap8" style="margin-top:10px"><span class="muted row gap6" style="font-size:12.5px">{icon("loader-circle", 14)}Trying again in 3 s</span>'
+                  f'<div class="grow"></div><span class="btn sm">{icon("refresh-cw", 14)}Retry now</span></div></div></div>')
+    t = ""
+    if toast and not stale:
+        t = (f'<div class="card row gap12" style="padding:12px 14px;background:var(--surface-raised)"><span class="mg" style="width:32px;height:32px">{icon("lock", 15)}</span>'
              f'<div><div style="font-weight:500">sara took control of Rover</div><div class="muted" style="font-size:12.5px">3 min ago · you can still press Stop</div></div></div>')
-    return (f'<div class="phone">{phone_top("Fleet")}<div style="padding:16px" class="col gap12"><div class="row"><b style="font-size:17px;font-weight:600">Robots</b>'
-            f'<div class="grow"></div><span class="btn sm">{icon("plus", 15)}Add</span></div>{"".join(cards)}{toast}</div>{phone_tabbar()}</div>')
+    head = phead("Robots", "4 robots on this hub · up to 4", f'<span class="btn sm primary">{icon("plus", 15)}Add</span>')
+    return banner + head + "".join(p_fleet_card(k, stale) for k in ROBOTS) + t
 
 
-def phone_camera():
+def p_fleet_empty():
+    need = "".join(f'<div class="row gap10" style="margin-top:10px;align-items:flex-start;font-size:13.5px">{icon(ic, 16, color="var(--text-2)")}<span>{t}</span></div>' for ic, t in
+                   [("wifi", "The robot switched on and on the lab Wi-Fi"),
+                    ("hash", 'Its IP address, e.g. <span class="mono">192.168.149.1</span>'),
+                    ("key-round", "Its password (used once, not saved)")])
+    return (phead("Robots", "No robots on this hub yet · up to 4") +
+            f'<div style="border:1px dashed var(--border-strong);border-radius:16px;padding:34px 18px 22px;display:flex;flex-direction:column;align-items:center;text-align:center">'
+            f'<div class="mg lg">{icon("bot", 22)}</div><div style="font-size:17px;font-weight:600;margin-top:16px">No robots yet. Press Add robot to set one up.</div>'
+            f'<p class="muted" style="margin-top:8px;font-size:14px">The hub installs its program on the robot for you. It takes a few minutes the first time.</p>'
+            f'<div class="card" style="width:100%;padding:14px 16px;margin-top:20px;text-align:left"><div class="muted" style="font-size:13px">What you need</div>{need}</div>'
+            f'<span class="btn primary" style="margin-top:20px;height:46px;width:100%;font-size:15px">{icon("plus", 16)}Add robot</span></div>')
+
+
+# ---- robot view
+
+def p_robot_tabs(active, locked=False):
+    out = []
+    for t, ic in TABS:
+        lock = icon("lock", 12, color="var(--text-3)") if locked and t in ("Drive", "Arm") else ""
+        out.append(f'<span class="{"on" if t == active else ""}">{icon(ic, 15)}{t}{lock}</span>')
+    return f'<div class="ptabs">{"".join(out)}</div>'
+
+
+def p_camera(rkey, mini=False):
+    r = ROBOTS[rkey]
+    stale = r["status"] == "unresponsive"
+    variant = 1 if rkey == "rover" else (2 if rkey == "scout" else 0)
+    if mini:
+        lbl = (f'<span style="color:var(--warn-text);display:flex;gap:4px;align-items:center">{icon("triangle-alert", 12)}6 s ago</span>' if stale
+               else '<span style="width:6px;height:6px;border-radius:50%;background:#fff"></span>Live')
+        return (f'<div class="cam" style="width:132px;height:99px;flex:none">{scene(stale, variant)}'
+                f'<div class="ov" style="top:6px;left:6px;height:22px;font-size:11.5px;padding:0 7px">{lbl}</div></div>')
+    top = (f'<span style="color:var(--warn-text);display:flex;gap:6px;align-items:center">{icon("triangle-alert", 14)}Last picture 6 s ago · reconnecting</span>'
+           if stale else '<span style="width:6px;height:6px;border-radius:50%;background:#fff"></span>Live · <span class="num">5 fps</span>')
+    return camera(362, quality="low", top=top, dark=stale, variant=variant)
+
+
+def p_robot(rkey, tab, content, mini=False, header_ctrl="keep", moving=None, locked=False, overlay=""):
+    """The robot page on a phone, in the layout of the first approved phone screen: camera, status, the
+    robot's big Stop, then the controls straight underneath, so the camera stays in view while you drive.
+    Take control / Release sit in the Drive and Arm card headers, next to the controls they unlock."""
+    r = ROBOTS[rkey]
+    ctrl = r["ctrl"] if header_ctrl == "keep" else header_ctrl
+    mv = r["moving"] if moving is None else moving
+    pills = (f'<div class="row gap6" style="flex-wrap:wrap">{status_pill(r["status"], True)}{moving_pill(True) if mv else ""}'
+             f'{ctrl_pill(ctrl, True)}</div>')
+    slow = f' <span style="color:var(--warn-text)">slow</span>' if r["status"] == "unresponsive" else ""
+    sub = f'<span class="mono">{r["host"]}</span> · <span class="num">{r["lat"]}</span>{slow} · {r["seen"]}'
+    title = f'{r["name"]}{icon("chevron-down", 16, color="var(--text-2)")}'
+    if mini:   # tabs without the camera keep a small live picture, so you still see the robot
+        head = (f'<div class="row gap12" style="align-items:flex-start">{p_camera(rkey, True)}<div class="col gap8">'
+                f'<div class="row gap6" style="flex-wrap:wrap">{status_pill(r["status"], True)}{moving_pill(True) if mv else ""}{ctrl_pill(ctrl, True)}</div>'
+                f'<span class="muted" style="font-size:12px">The camera stays live on every tab. Tap it to make it bigger.</span></div></div>')
+    else:
+        head = p_camera(rkey) + pills
+    stop = f'<div class="btn stop" style="width:100%;height:52px;font-size:17px;border-radius:14px">{icon("octagon", 20)}Stop {r["name"]}</div>'
+    return phone(title, head + p_robot_tabs(tab, locked) + stop + content, back=True, sub=sub, overlay=overlay)
+
+
+def control_action(mode):
+    """The button that goes with who's in control: Release (you), Take control (nobody), or a Watching tag."""
+    if mode == "you":
+        return f'<span class="btn sm">{icon("lock-open", 14)}Release</span>'
+    if mode == "ro":
+        return f'<span class="pill sm p-ctl" style="padding-left:8px">{icon("eye", 13)}Watching</span>'
+    return f'<span class="btn sm primary">{icon("gamepad-2", 14)}Take control</span>'
+
+
+def p_drive(mode="you", lat="18 ms"):
+    """The first phone design's pad: six touch buttons in one row, right under the big Stop.
+    Hold a button to move; let go and the robot stops."""
     keys = [("Q", "rotate-ccw"), ("W", "arrow-up"), ("E", "rotate-cw"), ("A", "arrow-left"), ("S", "arrow-down"), ("D", "arrow-right")]
-    pad = "".join(f'<div class="key {"held" if k == "W" else ""}" style="height:56px;flex:1;font-size:11px">{icon(ic, 18)}<span class="mono">{k}</span></div>' for k, ic in keys)
-    live = '<span style="width:6px;height:6px;border-radius:50%;background:#fff"></span>Live · <span class="num">5 fps</span>'
-    big_stop = (f'<div class="btn stop" style="width:100%;height:52px;font-size:17px;margin-top:12px;border-radius:14px">'
-                f'{icon("octagon", 20)}Stop Clanker</div>')
-    return (f'<div class="phone">{phone_top("Clanker", back=True)}<div style="padding:14px 14px 0">{camera(362, quality="low", top=live)}'
-            f'<div class="row gap6" style="margin-top:12px;flex-wrap:wrap">{status_pill("connected", True)}{moving_pill(True)}{ctrl_pill("you", True, long=True)}</div>'
-            f'<div class="muted num" style="font-size:12.5px;margin-top:6px">18 ms</div>{big_stop}'
-            f'<div class="card" style="padding:14px;margin-top:12px"><div class="row"><b style="font-weight:500;font-size:15px">Drive</b><div class="grow"></div>'
-            f'<span class="muted" style="font-size:13px">Speed <b style="color:var(--text);font-weight:500">40%</b></span></div><div class="row gap6" style="margin-top:12px">{pad}</div>'
-            f'<div class="sending" style="margin-top:12px;font-size:11.5px">Sending: <b>Forward +0.40</b> · Strafe 0.00 · Rotate 0.00</div>'
-            f'<p class="muted" style="font-size:12.5px;margin-top:10px">Hold a button to move; let go and the robot stops.</p></div>'
-            f'<p class="muted" style="text-align:center;margin-top:14px;font-size:13px">Distance <b style="color:var(--text);font-weight:500">42 cm</b>&nbsp;&nbsp;&nbsp;Turned <b style="color:var(--text);font-weight:500">87.5°</b></p>'
-            f'</div>{phone_tabbar()}</div>')
+    pad = "".join(f'<div class="key {"held" if (mode == "you" and k == "W") else ("ro" if mode == "ro" else "")}" style="height:56px;flex:1;font-size:11px">'
+                  f'{icon(ic, 18)}<span class="mono">{k}</span></div>' for k, ic in keys)
+    head = (f'<div class="row gap10"><b style="font-weight:500;font-size:15px">Drive</b><div class="grow"></div>'
+            f'<span class="muted" style="font-size:13px">Speed <b style="color:var(--text);font-weight:500">40%</b></span>{control_action(mode)}</div>')
+    if mode == "ro":
+        tail = f'<div class="note" style="margin-top:12px;font-size:13px">{icon("lock", 15)}Read-only while sara is in control. The red Stop still works.</div>'
+    else:
+        send = ("Sending: <b>Forward +0.40</b> · Strafe 0.00 · Rotate 0.00" if mode == "you"
+                else "Sending: Forward 0.00 · Strafe 0.00 · Rotate 0.00")
+        tail = (f'<div class="sending" style="margin-top:12px;font-size:11.5px">{send}</div>'
+                f'<p class="muted" style="font-size:12.5px;margin-top:10px">Hold a button to move; let go and the robot stops.</p>')
+    readout = (f'<p class="muted" style="text-align:center;font-size:13px">Distance <b style="color:var(--text);font-weight:500">'
+               f'{"118" if mode == "ro" else "42"} cm</b>&nbsp;&nbsp;&nbsp;Turned <b style="color:var(--text);font-weight:500">{"−12.0" if mode == "ro" else "87.5"}°</b></p>')
+    return f'<div class="card" style="padding:14px">{head}<div class="row gap6" style="margin-top:12px">{pad}</div>{tail}</div>{readout}'
+
+
+def p_arm(mode="you"):
+    """Five joints, one line each, under the big Stop so you can watch the arm move in the camera."""
+    rows = []
+    for n, v in ARM:
+        p = (v - 500) / 2000 * 100
+        rows.append(f'<div class="row gap10" style="height:38px"><span style="width:66px;font-size:13.5px">{n}</span>'
+                    f'<div class="slider grow"><div class="tr"></div><div class="fill" style="width:{p:.1f}%"></div><div class="th" style="left:{p:.1f}%"></div></div>'
+                    f'<b class="mono num" style="font-weight:500;font-size:12.5px;width:62px;text-align:right">{v} µs</b></div>')
+    head = (f'<div class="row gap10" style="margin-bottom:4px"><b style="font-weight:500;font-size:15px">Arm</b><div class="grow"></div>'
+            f'<span class="muted" style="font-size:13px">500–2500 µs</span>{control_action(mode)}</div>')
+    btns = (f'<div class="row gap8" style="margin-top:8px">{stopbtn("Stop (arm holds)", cls="grow")}'
+            f'<span class="btn danger-soft grow">{icon("hand", 16)}Release (go limp)</span></div>')
+    note = (f'<p class="muted" style="font-size:12.5px;margin-top:10px">Nothing is sent until you move a slider. '
+            f'A joint\'s first move after the robot restarts jumps straight to the slider, so start close to where it really is.</p>')
+    return f'<div class="card" style="padding:14px">{head}{"".join(rows)}{btns}{note}</div>'
+
+
+def p_sensors(calibrating=False):
+    pts = [(0, 38), (40, 40), (70, 38), (100, 46), (140, 58), (175, 64), (200, 62), (240, 52), (280, 40), (320, 24), (350, 12),
+           (370, 14), (400, 26), (440, 38), (480, 44), (520, 48), (560, 51), (600, 52)]
+    line = " ".join(f"{x},{y}" for x, y in pts)
+    chart = (f'<svg width="100%" height="70" viewBox="0 0 600 80" preserveAspectRatio="none"><line x1="0" y1="2" x2="600" y2="2" stroke="var(--border-strong)" stroke-dasharray="3 4"/>'
+             f'<polygon points="0,80 {line} 600,80" fill="var(--info)" fill-opacity=".15"/>'
+             f'<polyline points="{line}" fill="none" stroke="var(--info)" stroke-width="2"/></svg>')
+    dist = (f'<div class="row gap12"><div class="num" style="font-size:36px;font-weight:500;line-height:1;white-space:nowrap">42<small style="font-size:15px;color:var(--text-2);font-weight:400"> cm</small></div>'
+            f'<span class="muted" style="font-size:12.5px">Since you opened this: lowest <b style="color:var(--text);font-weight:500">12 cm</b>, highest <b style="color:var(--text);font-weight:500">180 cm</b></span></div>'
+            f'<div style="margin-top:10px;position:relative">{chart}<span class="faint" style="position:absolute;right:0;top:4px;font-size:11px">200 cm</span></div>'
+            f'<div class="row between faint" style="font-size:11px"><span>3 min ago</span><span>now</span></div>'
+            f'<div class="note good" style="margin-top:10px;font-size:13px">{icon("circle-check", 16)}Working: the reading follows what is in front of the sensor.</div>')
+    tiltsvg = ('<svg width="56" height="56" viewBox="0 0 66 66"><circle cx="33" cy="33" r="31" fill="none" stroke="var(--border-strong)"/>'
+               '<circle cx="33" cy="33" r="16" fill="none" stroke="var(--border-strong)" stroke-dasharray="2 3"/>'
+               '<line x1="33" y1="4" x2="33" y2="62" stroke="var(--border)"/><line x1="4" y1="33" x2="62" y2="33" stroke="var(--border)"/>'
+               + ('' if calibrating else '<circle cx="34" cy="31" r="5" fill="var(--text)"/>') + '</svg>')
+    if calibrating:
+        right = f'<span class="pill sm p-info">{icon("loader-circle", 13)}Calibrating…</span>'
+        turned = '<div class="faint" style="font-size:22px;margin-top:6px">—</div>'
+        tilt = '<div class="faint num" style="font-size:13px">X —<br>Y —</div>'
+        speed = 'Speed <span style="margin-left:12px">X —</span><span style="margin-left:12px">Y —</span><span style="margin-left:12px">Z —</span>'
+        bottom = (f'<div class="note info" style="margin-top:12px;align-items:flex-start">{icon("loader-circle", 18)}<div class="grow">'
+                  f'<b style="font-weight:500">Calibrating… keep the robot still</b><div class="muted" style="font-size:12.5px">Readings come back in about 2 seconds.</div></div></div>'
+                  f'<span class="btn dis" style="width:100%;margin-top:10px">{icon("crosshair", 15)}Calibrate gyro</span>')
+    else:
+        right = ""
+        turned = '<div class="num" style="font-size:28px;font-weight:500;margin-top:4px">87.5°</div><div class="muted" style="font-size:13px">left of the start</div>'
+        tilt = '<div class="num" style="font-size:13px">X 0.4°<br>Y −1.2°</div>'
+        speed = ('Speed <span style="margin-left:12px">X <b class="num" style="font-weight:500">0 °/s</b></span>'
+                 '<span style="margin-left:12px">Y <b class="num" style="font-weight:500">0 °/s</b></span>'
+                 '<span style="margin-left:12px">Z <b class="num" style="font-weight:500">32 °/s</b></span>')
+        bottom = (f'<span class="btn" style="width:100%;margin-top:12px">{icon("crosshair", 15)}Calibrate gyro</span>'
+                  f'<p class="muted" style="font-size:12.5px;margin-top:8px">Keep the robot still for 2 seconds. Z drifts about 1° a minute, so calibrate again to zero it.</p>')
+    gyro = (f'<div class="row gap16"><div class="col" style="align-items:center;gap:4px">{dial(87.5, not calibrating)}<span class="muted" style="font-size:12px">Rotation Z</span></div>'
+            f'<div class="grow"><div class="muted" style="font-size:13px">Turned (Z)</div>{turned}</div></div>'
+            f'<div class="row gap12" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">{tiltsvg}<div class="grow"><div class="muted" style="font-size:12.5px">Tilt X / Y</div>{tilt}</div></div>'
+            f'<div class="sending" style="font-family:inherit;margin-top:12px;font-size:12.5px">{speed}</div>{bottom}')
+    battery = (f'<div class="card row gap10" style="padding:12px 14px;color:var(--text-3)">{icon("battery", 16)}Battery<div class="grow"></div>'
+               f'<span class="pill sm p-ctl" style="padding-left:8px;color:var(--text-2)">Coming soon</span></div>')
+    return (pcard("Distance", "radar", dist, '<span class="faint" style="font-size:12px">Ultrasonic · up to 2 m</span>')
+            + pcard("Gyro", "rotate-3d", gyro, right) + battery)
+
+
+def p_terminal(empty=False):
+    border = "border-color:var(--stop-border)"
+    if empty:
+        body = '<div class="mono faint" style="font-size:12px;height:90px">Nothing run yet in this session.</div>'
+    else:
+        body = f'<div class="mono" style="font-size:10.5px;line-height:1.7;color:var(--text);overflow-wrap:anywhere">{TERM_OUT}</div>'
+    return (f'<div class="card" style="{border}"><div style="padding:12px 14px;background:var(--stop-bg);border-bottom:1px solid var(--stop-border);border-radius:14px 14px 0 0">'
+            f'<div class="row gap8">{icon("terminal", 17, color="#F87171")}<b style="font-weight:600">Terminal on Clanker</b><div class="grow"></div>'
+            f'<span class="help" style="color:#F87171;border-color:var(--stop-border)">{icon("circle-help", 13)}</span></div>'
+            f'<div class="muted" style="font-size:12.5px;margin-top:3px">Runs as pi · every command is logged</div></div>'
+            f'<div style="padding:12px;background:var(--surface-deep)">{body}</div>'
+            f'<div class="row gap8" style="padding:10px 12px;border-top:1px solid var(--border)">'
+            f'<div class="inp grow mono" style="height:42px;font-size:12.5px;padding:0 10px"><span class="faint">~/swarm-agent $</span><span class="caret"></span></div>'
+            f'<span class="btn primary" style="height:42px">{icon("corner-down-left", 15)}Run</span></div>'
+            f'<p class="muted" style="font-size:12.5px;padding:10px 14px 12px;border-top:1px solid var(--border)">One command at a time, stops after 30 seconds. '
+            f'Programs that need typing (nano, top) won\'t work. <span style="color:var(--text)">Clear</span></p></div>')
+
+
+def p_info():
+    rows = "".join(f'<div class="prow" style="font-size:13.5px"><span class="muted" style="width:128px;flex:none">{k}</span><span class="row gap6">{_info_value(v)}</span></div>'
+                   for k, v in INFO_ROWS)
+    caps = "".join(f'<span class="pill sm p-ctl" style="padding-left:8px">{icon(ic, 13)}{t}</span>' for ic, t in INFO_CAPS)
+    joints = "".join(f'<div style="padding:9px 11px;border:1px solid var(--border);border-radius:10px"><div class="mono" style="font-size:12.5px">{j}</div>'
+                     f'<div class="muted num" style="font-size:12px">500–2500</div></div>' for j in ("base", "shoulder", "elbow", "wrist", "gripper"))
+    sens = "".join(f'<span class="code" style="font-size:11.5px">{s}</span>' for s in INFO_SENSORS)
+    inner = (f'{rows}<div class="muted" style="font-size:13px;margin:12px 0 8px">What it can do</div><div class="row gap6" style="flex-wrap:wrap">{caps}</div>'
+             f'<div class="muted" style="font-size:13px;margin:14px 0 8px">Arm joints and limits (µs)</div>'
+             f'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">{joints}</div>'
+             f'<div class="muted" style="font-size:13px;margin:14px 0 8px">Sensors</div><div class="row gap6" style="flex-wrap:wrap">{sens}</div>'
+             f'<div class="row gap8" style="margin-top:16px"><span class="btn grow">{icon("download", 15)}Update…</span>'
+             f'<span class="btn danger-soft grow">{icon("trash-2", 15)}Remove…</span></div>')
+    return pcard("Info", "info", inner)
+
+
+def p_activity():
+    rows = "".join(f'<div class="prow" style="align-items:flex-start;padding:11px 14px"><span class="num muted" style="width:64px;flex:none;font-size:12.5px;padding-top:1px">{t}</span>'
+                   f'<div class="grow"><div class="row gap6" style="font-size:12.5px;color:var(--text-2)">'
+                   + (f'<span class="av" style="width:18px;height:18px;font-size:8.5px">{p[:2].upper()}</span>{p}' if p else '<span class="faint">the robot</span>')
+                   + f'</div><div class="row gap6" style="margin-top:4px;align-items:flex-start;font-size:13.5px">{icon(ic, 15, color="var(--text-2)")}<span>{w}</span></div></div></div>'
+                   for t, p, ic, w in ACT)
+    foot = (f'<div class="row between" style="padding:12px 14px;border-top:1px solid var(--border)"><span class="faint" style="font-size:12.5px">9 of 11 today</span>'
+            f'<span class="row gap6" style="font-size:13px">Open in History{icon("arrow-right", 14)}</span><span class="btn sm">Load more</span></div>')
+    return pcard("Activity", "history", rows + foot, '<span class="faint" style="font-size:12.5px">Clanker · today</span>', pad=False)
+
+
+def p_switcher():
+    """The phone's version of the hideable robot list: a sheet opened from the robot's name."""
+    rows = []
+    for k, r in ROBOTS.items():
+        sel = " sel" if k == "clanker" else ""
+        dim = ' style="opacity:.8"' if r["status"] != "connected" else ""
+        extra = (moving_pill(sm=True) if r["moving"] else "") + (ctrl_pill(r["ctrl"], sm=True) if r["ctrl"] else "")
+        rows.append(f'<div class="rrow{sel}"{dim}><div class="row gap10"><span class="mg" style="width:32px;height:32px;font-size:11.5px">{r["mg"]}</span>'
+                    f'<div class="grow"><div style="font-size:14.5px">{r["name"]}</div><div class="mono faint" style="font-size:11.5px">{r["host"]}</div></div>'
+                    f'{stopbtn(off=r["status"] == "offline", cls="sm")}</div>'
+                    f'<div class="row gap6" style="margin-top:8px;flex-wrap:wrap">{status_pill(r["status"], sm=True)}{extra}</div></div>')
+    return (f'<div class="dlg"><div class="dlg-h"><div class="grow"><h2>Switch robot</h2><p class="muted" style="margin-top:4px;font-size:13.5px">3 of 4 online</p></div>'
+            f'<span style="color:var(--text-2)">{icon("x", 18)}</span></div><div class="dlg-b"><div class="list">{"".join(rows)}</div>'
+            f'<p class="muted" style="font-size:12.5px;margin-top:12px">Switching robots closes this one\'s panel: your buttons stop sending, and your control of it is released. '
+            f'You don\'t get control of the next robot until you take it.</p></div></div>')
+
+
+# ---- other pages
+
+def p_history():
+    def sel(ic, t):
+        return (f'<div class="inp grow" style="height:42px;font-size:14px;background:var(--surface-deep)">{icon(ic, 15, color="var(--text-2)")}'
+                f'<span class="grow">{t}</span>{icon("chevron-down", 15, color="var(--text-2)")}</div>')
+    types = [("All", None), ("Connections", "wifi"), ("Control", "lock"), ("Stops", "octagon"), ("Terminal", "terminal"), ("Installs", "download")]
+    chips = "".join((f'<span class="btn sm primary" style="flex:none">{t}</span>' if ic is None else f'<span class="btn sm" style="flex:none">{icon(ic, 14)}{t}</span>')
+                    for t, ic in types)
+    filters = (f'<div class="card" style="padding:12px 14px"><div class="row gap8">{sel("bot", "All robots")}{sel("user", "Anyone")}</div>'
+               f'<div class="row" style="margin-top:8px">{sel("calendar", "Today · 10 Nov 2026")}</div>'
+               f'<div class="row gap6" style="margin:12px -14px 0;padding:0 14px;overflow:hidden">{chips}</div></div>')
+    rows = []
+    for t, rob, who, ic, typ, what in HIST[:14]:
+        rc = (f'<span class="mg sm" style="width:18px;height:18px;font-size:8.5px;border-radius:5px">{rob[:2]}</span>{rob[3:]}' if rob else 'All robots')
+        pc = f' · {who}' if who else ""
+        rows.append(f'<div class="prow" style="align-items:flex-start;padding:11px 14px"><span class="num muted" style="width:64px;flex:none;font-size:12.5px;padding-top:1px">{t}</span>'
+                    f'<div class="grow"><div class="row gap6" style="font-size:12.5px;color:var(--text-2)">{rc}{pc}<div class="grow"></div>{icon(ic, 13)}{typ}</div>'
+                    f'<div style="margin-top:4px;font-size:13.5px">{what}</div></div></div>')
+    foot = (f'<div class="row between" style="padding:12px 14px;border-top:1px solid var(--border)"><span class="faint" style="font-size:12.5px">14 of 20 today · newest first</span>'
+            f'<span class="btn sm">Load more</span></div>')
+    return (phead("Everything that happened", "Connections, who took control, stops, terminal commands, installs. Kept for 90 days.")
+            + filters + f'<div class="card">{"".join(rows)}{foot}</div>')
+
+
+def p_health():
+    tiles = []
+    for name, val, sub, gauge in HEALTH_TILES:
+        span = "grid-column:span 2;" if gauge else ""
+        tiles.append(f'<div class="card" style="{span}padding:12px 13px;background:var(--surface-deep)"><div class="muted" style="font-size:12.5px">{name}</div>'
+                     f'<div class="num" style="font-size:22px;font-weight:500;margin:4px 0 2px">{val}</div><div class="muted" style="font-size:12px">{sub}</div>'
+                     f'{temp_gauge() if gauge else ""}</div>')
+    hub = (f'<div class="card"><div class="row gap8" style="padding:13px 14px;border-bottom:1px solid var(--border)">{icon("server", 17)}<div class="grow">'
+           f'<b style="font-size:15px;font-weight:600">Hub machine</b><div class="muted" style="font-size:12.5px">Raspberry Pi 5 in the lab</div></div>{status_pill("connected", sm=True)}</div>'
+           f'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 14px">{"".join(tiles)}</div></div>')
+    robots = []
+    for k, lat, sp, rec, seen in health_robots():
+        r = ROBOTS[k]
+        if sp is None:
+            sp = '<div style="height:32px;border:1px dashed var(--border-strong);border-radius:8px;display:flex;align-items:center;padding-left:10px;font-size:12.5px" class="muted">No data · offline for 3 h</div>'
+        warn = k == "scout"
+        w = f' <span style="color:var(--warn-text);font-size:12px">{icon("triangle-alert", 12)}</span>' if warn else ""
+
+        def stat(lbl, v):
+            return f'<div class="grow"><div class="muted" style="font-size:12px">{lbl}</div><div class="num" style="font-size:14.5px">{v}</div></div>'
+        robots.append(f'<div style="padding:12px 14px;border-bottom:1px solid var(--border)"><div class="row gap10"><span class="mg" style="width:30px;height:30px;font-size:11.5px">{r["mg"]}</span>'
+                      f'<div class="grow"><div>{r["name"]}</div><div class="mono faint" style="font-size:11.5px">{r["host"]}</div></div>{status_pill(r["status"], sm=True)}</div>'
+                      f'<div class="row gap8" style="margin-top:10px">{stat("Latency now", lat + w)}{stat("Reconnects (24 h)", rec + w)}{stat("Last seen", seen)}</div>'
+                      f'<div style="margin-top:8px">{sp}</div><div class="row between faint" style="font-size:11px;width:240px"><span>1 h ago</span><span>now</span></div></div>')
+    rcard = (f'<div class="card"><div style="padding:13px 14px;border-bottom:1px solid var(--border)"><div class="row gap8">{icon("radio", 17)}<b style="font-size:15px;font-weight:600">Robots</b></div>'
+             f'<div class="muted" style="font-size:12.5px;margin-top:3px">Latency under 50 ms is good; over 200 ms feels laggy.</div></div>{"".join(robots)}</div>')
+    note = (f'<div class="note warn" style="align-items:flex-start">{icon("triangle-alert", 17)}<span><b style="font-weight:600">Scout keeps reconnecting: check its Wi-Fi</b>'
+            f'<span class="muted"> · 7 reconnects in the last 24 h. Everything else is fine.</span></span></div>')
+    return phead("Health", "How the hub machine in the lab is doing, and how good each robot's connection is.") + note + hub + rcard
+
+
+def p_help():
+    search = (f'<div class="inp" style="background:var(--surface)">{icon("search", 16, color="var(--text-2)")}'
+              f'<span class="ph">Search help, e.g. "calibrate"</span></div>')
+    arts = "".join(f'<div class="prow" style="padding:12px 14px;align-items:flex-start"><span class="mg" style="width:32px;height:32px">{icon(ic, 16)}</span>'
+                   f'<div class="grow"><div style="font-size:15px;font-weight:600">{t}</div><div class="muted" style="font-size:13px;margin-top:2px">{d}</div>'
+                   f'<div class="faint" style="font-size:12px;margin-top:4px">{rt}</div></div>{icon("chevron-right", 16, color="var(--text-3)")}</div>'
+                   for ic, t, d, rt in HELP_ARTS)
+
+    def box(ic, t, d):
+        return (f'<div style="border:1px solid var(--border-strong);border-radius:12px;padding:11px 14px;background:var(--surface-deep)">'
+                f'<div class="row gap8" style="font-weight:500">{icon(ic, 16)}{t}</div><div class="muted" style="font-size:12.5px;margin-top:2px">{d}</div></div>')
+
+    def link(t):
+        return (f'<div class="row gap10" style="padding:6px 0 6px 20px;font-size:12.5px"><div style="width:1px;height:30px;background:var(--border-strong)"></div>'
+                f'<span class="muted">{t}</span></div>')
+    rb = "".join(f'<span class="row gap6" style="border:1px solid var(--border-strong);border-radius:9px;padding:6px 9px;background:var(--surface-deep);font-size:13px">'
+                 f'<span class="mg sm" style="width:20px;height:20px;font-size:9px">{r["mg"]}</span>{r["name"]}</span>' for r in ROBOTS.values())
+    diagram = (f'<div style="padding:14px">{box("laptop", "The app", "In your browser, on a team laptop or phone")}'
+               f'{link("Tailscale (private network): sign-in · live updates · camera")}'
+               f'{box("server", "The hub", "Raspberry Pi 5 in the lab. Keeps history, checks who is in control")}'
+               f'{link("Lab Wi-Fi: commands · heartbeats every second")}'
+               f'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">{rb}</div>'
+               f'<p class="muted" style="margin-top:12px;font-size:13px">Robots only talk to the hub, never to your phone. If the hub goes silent for 3 seconds, every robot stops by itself. '
+               f'If your connection drops while you drive, the robot stops within half a second.</p></div>')
+    me = (f'<div class="card row gap10" style="padding:12px 14px"><span class="mg" style="width:34px;height:34px;font-size:12px">AS</span>'
+          f'<div class="grow"><b style="font-weight:500">asmaa</b><div class="muted" style="font-size:12.5px">Signed in</div></div>'
+          f'<span class="btn sm">{icon("log-out", 15)}Sign out</span></div>')
+    return (phead("Help", "Short answers. Every panel's <b>?</b> opens the matching article.") + search
+            + f'<div class="card">{arts}</div>'
+            + f'<div class="card"><div class="row gap8" style="padding:13px 14px;border-bottom:1px solid var(--border)">{icon("network", 17)}'
+              f'<b style="font-size:15px;font-weight:600">How the system works</b></div>{diagram}</div>' + me)
+
+
+def p_help_article():
+    art, side = help_article_parts()
+    art = (art.replace("padding:28px 34px;flex:1", "padding:18px 16px")
+              .replace("font-size:28px;font-weight:600;margin:22px 0 12px", "font-size:23px;font-weight:600;margin:18px 0 10px")
+              .replace("font-size:15px;line-height:1.6", "font-size:14.5px;line-height:1.55"))
+    side = side.replace("width:300px", "width:auto")
+    return art + side
+
+
+# ---- components
+
+def p_components():
+    def sec(t, inner, note=""):
+        n = f'<p class="muted" style="font-size:12.5px;margin-top:10px">{note}</p>' if note else ""
+        return f'<div class="card" style="padding:14px"><div style="font-size:15px;font-weight:600;margin-bottom:12px">{t}</div>{inner}{n}</div>'
+
+    def framed(x):
+        return f'<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:8px">{x}</div>'
+    tops = (framed(phone_top("Fleet")) + framed(phone_top(f'Clanker{icon("chevron-down", 16, color="var(--text-2)")}', True,
+            '<span class="mono">masterpi-01</span> · 18 ms · seen now')) + framed(phone_top("Fleet", sub="down")))
+    keys = (f'<div class="pad" style="gap:8px"><div class="key" style="height:66px;font-size:12px">{icon("arrow-up", 20)}Normal</div>'
+            f'<div class="key held" style="height:66px;font-size:12px">{icon("arrow-up", 20)}Held</div>'
+            f'<div class="key stopk" style="height:66px">{icon("octagon", 20)}Stop</div>'
+            f'<div class="key ro" style="height:58px;font-size:12px">{icon("arrow-up", 20)}Read-only</div></div>')
+    stops = (f'<div class="btn stop bigstop">{icon("octagon", 20)}Stop Clanker</div>'
+             f'<div class="row gap8" style="margin-top:10px">{stopbtn(cls="sm")}{stopbtn("Stop", off=True, cls="sm")}'
+             f'<div class="grow"></div>{stopbtn("Stop all", None, "stopall", size=17).replace("stopall", "stopall sm")}</div>')
+    sheet = (f'<div style="position:relative;border:1px solid var(--border-strong);border-radius:22px 22px 0 0;background:var(--surface);padding:24px 16px 16px">'
+             f'<div style="position:absolute;top:8px;left:50%;width:40px;height:5px;margin-left:-20px;border-radius:3px;background:var(--border-strong)"></div>'
+             f'<b style="font-size:17px;font-weight:600">Sheet title</b><p class="muted" style="font-size:13px;margin-top:4px">What happens if you go ahead.</p>'
+             f'<span class="btn primary" style="width:100%;height:46px;margin-top:14px">Main action</span><span class="btn" style="width:100%;height:46px;margin-top:8px">Cancel</span></div>')
+    rules = "".join(f'<div class="row gap10" style="margin-top:8px;align-items:flex-start;font-size:13.5px">{icon(ic, 16, color="var(--text-2)")}<span>{t}</span></div>' for ic, t in
+                    [("octagon", "Stop all is in the top bar on every signed-in screen, even under a sheet."),
+                     ("hand", "Touch targets are at least 44 px. The drive keys are 66 px."),
+                     ("camera", "The camera starts on Low · 5 fps on phones to save data."),
+                     ("gamepad-2", "Hold a drive button to move; let go and the robot stops. No key letters on phones."),
+                     ("camera", "On Drive and Arm, the controls sit right under the big Stop, so the camera stays in view while you drive."),
+                     ("panel-left", "Dialogs open as bottom sheets. Buttons stack full width, main action on top.")])
+    return (phead("Phone components", "The parts that change on a narrow screen. Everything else is the desktop set.")
+            + sec("Top bar", tops, "Shows where you are and the hub's state. On a robot, tap the name to switch robots.")
+            + sec("Tab bar", f'<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden">{phone_tabbar("fleet")}</div>')
+            + sec("Robot tabs", p_robot_tabs("Drive") + f'<div style="height:8px"></div>' + p_robot_tabs("Drive", locked=True),
+                  "Scroll sideways for the rest. A lock means someone else is in control.")
+            + sec("Stop buttons", stops, "The robot's own Stop is full width under the camera.")
+            + sec("Drive keys", keys)
+            + sec("Robot card (Fleet)", p_fleet_card("rover"))
+            + sec("Bottom sheet", sheet)
+            + sec("Rules", rules))
+
+
+# ---------------------------------------------------------------- phone screens
+
+def build_phone():
+    cl = "clanker"
+    you = p_drive("you")
+    S = {}
+    S["phone-01-sign-in"] = ("Phone · Sign in", p_sign_in(False))
+    S["phone-02-sign-in-error"] = ("Phone · Sign in · error", p_sign_in(True))
+    S["phone-03-fleet"] = ("Phone · Fleet", phone("Fleet", p_fleet()))
+    S["phone-04-fleet-empty"] = ("Phone · Fleet · empty", phone("Fleet", p_fleet_empty(), sub="none"))
+    S["phone-05-fleet-hub-disconnected"] = ("Phone · Fleet · hub unreachable", phone("Fleet", p_fleet(stale=True), sub="down"))
+    S["phone-06-robot-you-driving"] = ("Phone · Robot · you driving", p_robot(cl, "Drive", you))
+    S["phone-07-robot-someone-else-in-control"] = ("Phone · Robot · sara in control",
+                                                   p_robot("rover", "Drive", p_drive("ro", "24 ms"), locked=True))
+    S["phone-08-robot-nobody-in-control"] = ("Phone · Robot · nobody in control",
+                                             p_robot(cl, "Drive", p_drive("free"), header_ctrl=None, moving=False))
+    S["phone-09-switch-robot"] = ("Phone · Switch robot", p_robot(cl, "Drive", you, overlay=p_switcher()))
+    S["phone-10-tab-arm"] = ("Phone · Tab · Arm", p_robot(cl, "Arm", p_arm()))
+    S["phone-11-tab-arm-disabled"] = ("Phone · Tab · Arm · no arm board", p_robot("scout", "Arm", arm_card("none")))
+    S["phone-12-tab-sensors"] = ("Phone · Tab · Sensors", p_robot(cl, "Sensors", p_sensors(), mini=True))
+    S["phone-13-tab-sensors-calibrating"] = ("Phone · Tab · Sensors · calibrating", p_robot(cl, "Sensors", p_sensors(True), mini=True, moving=False))
+    S["phone-14-tab-terminal"] = ("Phone · Tab · Terminal", p_robot(cl, "Terminal", p_terminal(), mini=True))
+    S["phone-15-terminal-first-use-confirm"] = ("Phone · Terminal · first-use confirm",
+                                                p_robot(cl, "Terminal", p_terminal(empty=True), mini=True, overlay=terminal_confirm_dialog()))
+    S["phone-16-tab-info"] = ("Phone · Tab · Info", p_robot(cl, "Info", p_info(), mini=True))
+    S["phone-17-tab-activity"] = ("Phone · Tab · Activity", p_robot(cl, "Activity", p_activity(), mini=True))
+    S["phone-18-history"] = ("Phone · History", phone("History", p_history(), active="history"))
+    S["phone-19-health"] = ("Phone · Health", phone("Health", p_health(), active="health"))
+    S["phone-20-help"] = ("Phone · Help", phone("Help", p_help(), active="help"))
+    S["phone-21-help-article"] = ("Phone · Help · article", phone("Control", p_help_article(), back=True, active="help"))
+    empty = p_fleet_empty()
+    S["phone-22-add-robot"] = ("Phone · Sheet · Add robot", phone("Fleet", empty, sub="none", overlay=add_robot_dialog()))
+    S["phone-23-install-progress-running"] = ("Phone · Sheet · Installing", phone("Fleet", empty, sub="none", overlay=install_dialog("running")))
+    S["phone-24-install-success"] = ("Phone · Sheet · Install done", phone("Fleet", empty, sub="one", overlay=install_dialog("done")))
+    S["phone-25-install-failure"] = ("Phone · Sheet · Install failed", phone("Fleet", empty, sub="none", overlay=install_dialog("failed")))
+    S["phone-26-update-robot"] = ("Phone · Sheet · Update robot", p_robot(cl, "Info", p_info(), mini=True, overlay=update_dialog()))
+    S["phone-27-remove-robot"] = ("Phone · Sheet · Remove robot", phone("Fleet", p_fleet(toast=False), overlay=remove_dialog()))
+    S["phone-28-confirm-release-arm"] = ("Phone · Sheet · Release arm",
+                                         p_robot(cl, "Arm", p_arm(), overlay=release_arm_dialog()))
+    S["phone-29-components"] = ("Phone · Components", phone("Components", p_components(), active=None))
+    S["phone-30-fleet-light"] = ("Phone · Fleet · light", phone("Fleet", p_fleet()), "light")
+    S["phone-31-robot-light"] = ("Phone · Robot · light", p_robot(cl, "Drive", you), "light")
+    return S
 
 
 # ---------------------------------------------------------------- screens
@@ -1184,8 +1695,8 @@ def build():
     S["29-components"] = ("Components", app("fleet", crumb("Components"), components_page(), height=1560).replace('class="on"', 'class=""', 1), 1440, 1560)
     S["30-fleet-light"] = ("Fleet · light", app("fleet", crumb("Fleet"), fleet_header() + fleet_grid()), 1440, 900, "light")
     S["31-robot-light"] = ("Robot · light", app("fleet", crumb(*cl), cockpit("clanker", "Drive", control_card("you") + drive_card("you"))), 1440, 900, "light")
-    S["32-phone-fleet"] = ("Phone · Fleet", phone_fleet(), 390, 844)
-    S["33-phone-robot-camera"] = ("Phone · robot camera", phone_camera(), 390, 844)
+    for name, spec in build_phone().items():
+        S[name] = (spec[0], spec[1], 390, 844) + tuple(spec[2:])
     return S
 
 
@@ -1197,7 +1708,7 @@ def page(title, body, w, h, theme="dark"):
 
 def main():
     screens = build()
-    for old in HERE.glob("[0-9][0-9]-*.html"):
+    for old in list(HERE.glob("[0-9][0-9]-*.html")) + list(HERE.glob("phone-[0-9][0-9]-*.html")):
         old.unlink()
     for name, spec in screens.items():
         title, body, w, h = spec[:4]

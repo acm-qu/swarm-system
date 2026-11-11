@@ -191,11 +191,33 @@ svg.i{display:inline-block;flex:none;vertical-align:middle}
 .s-fail{background:var(--stop-bg);border:1px solid var(--stop-border);color:#F87171}
 .slog{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--text-2);background:var(--surface-deep);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:7px}
 
+
 /* phone */
 .phone{width:390px;min-height:844px;background:var(--bg);display:flex;flex-direction:column;position:relative}
-.ptop{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border);background:var(--topbar)}
-.ptab{margin-top:auto;display:flex;border-top:1px solid var(--border);background:var(--topbar);padding:10px 0 18px}
+.ptop{height:66px;flex:none;display:flex;align-items:center;gap:12px;padding:0 14px 0 16px;border-bottom:1px solid var(--border);background:var(--topbar)}
+.ptop .t{font-size:17px;font-weight:600;display:flex;align-items:center;gap:4px;line-height:1.25}
+.ptop .s{font-size:12px;color:var(--text-2);display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden}
+.ptop .stopall{height:38px;padding:0 12px;font-size:14.5px;gap:6px}
+.pbody{padding:14px;display:flex;flex-direction:column;gap:12px}
+.ptab{margin-top:auto;flex:none;display:flex;border-top:1px solid var(--border);background:var(--topbar);padding:10px 0 22px}
 .ptab div{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;color:var(--text-2)}
 .ptab div.on{color:var(--text)} .ptab div.on svg{color:var(--accent)}
+.ptabs{display:flex;gap:6px;overflow:hidden;margin:0 -14px;padding:0 14px}
+.ptabs span{flex:none;display:flex;align-items:center;gap:6px;height:36px;padding:0 13px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--text-2);font-size:13.5px}
+.ptabs span.on{background:var(--accent-soft);border-color:var(--accent-border);color:var(--text)}
+.ptabs span.on svg{color:var(--accent)}
+.bigstop{width:100%;height:50px;font-size:16.5px;border-radius:14px}
+.pscrim{position:absolute;left:0;right:0;top:66px;bottom:0;background:var(--overlay);z-index:5}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:6}
+.sheet .grab{position:absolute;top:8px;left:50%;width:40px;height:5px;margin-left:-20px;border-radius:3px;background:var(--border-strong);z-index:1}
+.sheet .dlg{width:auto!important;border-radius:22px 22px 0 0;border-bottom:0;box-shadow:0 -14px 40px rgba(0,0,0,.45)}
+.sheet .dlg-h{padding:26px 18px 0}
+.sheet .dlg-b{padding:14px 18px 16px}
+.sheet .dlg-f{flex-direction:column-reverse;align-items:stretch;gap:8px;padding:12px 18px 30px}
+.sheet .dlg-f .btn{width:100%;height:46px;font-size:15px}
+.sheet .dlg-f>.grow,.sheet .dlg-f>.help{display:none}
+.prow{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border)}
+.prow:last-child{border-bottom:0}
+.ph2{font-size:20px;font-weight:600}
 html,body{width:1440px;min-height:900px}</style></head><body><div style="width:1440px;height:900px;background:radial-gradient(ellipse 700px 420px at 50% 22%,rgba(232,172,101,.06),transparent),var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center"><div class="row gap12" style="margin-bottom:28px"><div class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="12" r="3.2" fill="#E8AC65"/><circle cx="5" cy="5" r="2.2" fill="currentColor"/><circle cx="19" cy="5" r="2.2" fill="currentColor"/><circle cx="5" cy="19" r="2.2" fill="currentColor"/><circle cx="19" cy="19" r="2.2" fill="currentColor"/></svg></div><div><div style="font-size:22px;font-weight:600">Swarm Hub</div><div class="muted" style="font-size:13px">Robot lab · sign in to continue</div></div></div><div class="card" style="width:400px;padding:28px;border-radius:18px"><div style="font-size:19px;font-weight:600">Sign in</div><p class="muted" style="margin:4px 0 22px">Use your hub login.</p><div class="field"><label>Username</label><div class="inp focus">asmaa<span class="caret"></span></div></div><div class="field" style="margin-top:16px"><label>Password</label><div class="inp"><span class="ph grow">Password</span><svg class="i " width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-2)"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" />
   <circle cx="12" cy="12" r="3" /></svg></div></div><span class="btn primary" style="width:100%;height:44px;margin-top:22px;font-size:15px">Sign in</span></div><p class="muted row gap8" style="margin-top:22px;font-size:13.5px"><svg class="i " width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></svg>Only team devices on our Tailscale network can open this page.</p></div></body></html>
