@@ -220,6 +220,7 @@ def robot_rows():
             "hostname": (r and r.get("hostname")) or (entry and entry.get("hostname")) or "",
             "address": (r["address"] if r else None) or (entry["host"] if entry else None),
             "installed": entry is not None,
+            "added": entry and entry.get("added"), "updated": entry and entry.get("updated"),
             "robot_type": (r and r.get("robot_type")) or "",
             "capabilities": r and r.get("capabilities"),
             "sensors": (r and r["online"] and r.get("sensors")) or {},

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Swarm Hub</title>
+  <meta name="csrf" content="{{ csrf }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+{% set logo %}
+<div class="logo" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+  <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+  <circle cx="12" cy="12" r="3.2" fill="#E8AC65"/><circle cx="5" cy="5" r="2.2" fill="currentColor"/>
+  <circle cx="19" cy="5" r="2.2" fill="currentColor"/><circle cx="5" cy="19" r="2.2" fill="currentColor"/>
+  <circle cx="19" cy="19" r="2.2" fill="currentColor"/></svg></div>
+{% endset %}
+{% if user %}
+<body data-user="{{ user }}">
+{% include 'icons.svg' %}
+<div class="app">
+  <aside class="side">
+    <div class="brand">{{ logo }}<div><b>Swarm Hub</b><span>Robot lab</span></div></div>
+    <nav class="nav" aria-label="Main">
+      <a href="#/" class="on" id="nav-fleet"><svg class="i"><use href="#layout-grid"/></svg>Fleet</a>
+      {% for ic, name in [('history', 'History'), ('activity', 'Health'), ('circle-help', 'Help')] %}
+      <a class="soon" aria-disabled="true"><svg class="i"><use href="#{{ ic }}"/></svg>{{ name }}<span class="tag">Soon</span></a>
+      {% endfor %}
+      <div class="navsep"></div>
+      {% for ic, name in [('list-checks', 'Jobs'), ('map', 'World'), ('workflow', 'Planner')] %}
+      <a class="soon" aria-disabled="true"><svg class="i"><use href="#{{ ic }}"/></svg>{{ name }}<span class="tag">Soon</span></a>
+      {% endfor %}
+    </nav>
+    <div class="me"><span class="mg">{{ user[:2]|upper }}</span><div><b>{{ user }}</b><span>Signed in</span></div></div>
+    <form method="post" action="{{ url_for('auth.logout') }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button type="submit" class="signout"><svg class="i"><use href="#log-out"/></svg>Sign out</button>
+    </form>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <div class="crumb" id="crumb"></div>
+      <div class="grow"></div>
+      <span class="chip" id="hub-chip"></span>
+      <span class="chip plain" id="online-chip"></span>
+      <span class="vsep"></span>
+      <span class="row gap8 who"><span class="av lg">{{ user[:2]|upper }}</span>{{ user }}</span>
+      <button type="button" class="btn stop stopall" id="stop-all" title="Stops every robot that is online. Keyboard: Esc twice">
+        <svg class="i"><use href="#octagon"/></svg><span id="stop-all-label">Stop all</span><span class="kbd">Esc Esc</span></button>
+    </header>
+    <main class="content" id="content"></main>
+  </div>
+</div>
+
+<div class="scrim" id="scrim" hidden>
+  <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlg-title" id="dlg"></div>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+{% else %}
+<body class="signin">
+  <div class="row gap12 signin-brand">{{ logo }}<div><div class="signin-name">Swarm Hub</div>
+    <div class="muted small">Robot lab · sign in to continue</div></div></div>
+  <div class="card signin-card">
+    <h1>Sign in</h1>
+    <p class="muted">Use your hub login.</p>
+    {% if error %}<div class="note warn" role="alert">{{ error }}</div>{% endif %}
+    <form method="post" action="{{ url_for('auth.login') }}">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <label class="field">Username<input class="inp" name="username" autocomplete="username" autofocus required></label>
+      {% set wrong = error and error.startswith('Wrong') %}
+      <label class="field">Password<input class="inp{% if wrong %} err{% endif %}" name="password" type="password" autocomplete="current-password" required></label>
+      {% if wrong %}<span class="muted small">Check your password and try again. After 5 wrong tries, sign-in pauses for a minute.</span>{% endif %}
+      <button type="submit" class="btn primary wide">Sign in</button>
+    </form>
+  </div>
+</body>
+{% endif %}
+</html>

@@ -9,6 +9,8 @@ A swarm of Raspberry Pi robots (rewired Hiwonder MasterPi chassis) controlled by
 - `hub/`: the PC app (Flask). It installs the agent on robots over SSH, shows their status, and sends
   commands. Run with `python -m hub` from the repo root. Planned (ARCHITECTURE.md): one shared hub on a
   Raspberry Pi 5 in the lab with a React front end in `web/`; local hubs stay for development.
+  The page at `/` is `hub/templates/app.html` + `hub/static/app.js` + `app.css`, built from the mockups in
+  `design/html/`; what they show that isn't built yet is in `TBD.md`. The old page stays at `/classic` until S6.
 - `robot/`: runs on each robot. The hub copies these files into `~/swarm-agent/` on the robot and runs
   `robot_agent.py` as the `swarm-agent` systemd service. Robots never pull code themselves. Edit here,
   then press **Update** in the hub.
@@ -41,9 +43,9 @@ once per robot on **Add robot**, and on **Update** only if the script has change
   hardware. (Today they are the full 500-2500 µs; mapping them is on the checklist in `docs/robots.md`.)
 - A new robot file must be added to `ROBOT_FILES` in `hub/config.py`, or the hub won't copy it.
 - A new capability: report it in `capabilities()` (robot_agent.py). The hub stores it per robot
-  (`robots.clean_capabilities`) and the page enables buttons from it (`hub/static/hub.js`).
+  (`robots.clean_capabilities`) and the page enables buttons from it (`hub/static/app.js`).
 - A new sensor: add it to `robot/sensors.py` (`setup`, `names`, `read`). Readings travel in each heartbeat
-  and appear in the Sensors column.
+  and appear on the robot's Sensors tab (under Other readings until it gets its own panel).
 - Match the existing style: plain-language error messages meant for students, short comments that say why.
 - Each robot has its own token (in `data/robots.json`, written to its `config.json` on Add/Update). The
   shared token in `robot_token.txt` still works for robots not updated yet and for test agents.

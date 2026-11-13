@@ -111,7 +111,7 @@ def serve():
     threading.Thread(target=run_server, daemon=True).start()
     if not wait_for_server():
         sys.exit("The server did not start.")
-    webview.create_window("Swarm Hub", f"http://127.0.0.1:{config.PORT}", width=1100, height=720)
+    webview.create_window("Swarm Hub", f"http://127.0.0.1:{config.PORT}", width=1280, height=820)
     webview.start()           # returns when you close the window; the server stops too
 
 
