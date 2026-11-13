@@ -13,7 +13,7 @@ bp = Blueprint("auth", __name__)
 
 fails = {}  # key -> (count, time of last failure)
 fails_lock = threading.Lock()
-DUMMY_HASH = generate_password_hash("not-a-real-password")
+DUMMY_HASH = generate_password_hash("not-a-real-password", method=config.PASSWORD_METHOD)
 
 
 def csrf_token():
@@ -60,13 +60,19 @@ def api_guard():
     return None
 
 
-def page(error=None, status=200):
-    return render_template("index.html", user=session.get("user"), csrf=csrf_token(), error=error), status
+def page(error=None, status=200, template="app.html"):
+    return render_template(template, user=session.get("user"), csrf=csrf_token(), error=error), status
 
 
 @bp.get("/")
 def home():
     return page()
+
+
+@bp.get("/classic")
+def classic():
+    """The old one-table page, kept until the new app has been used for a while (ARCHITECTURE.md, S6)."""
+    return page(template="index.html")
 
 
 @bp.post("/login")

@@ -23,6 +23,10 @@ SETUP_READ_TIMEOUT = 600   # give up on the package install if it prints nothing
 
 PORT = int(os.environ.get("PORT", "8000"))
 
+# How login passwords are hashed. Werkzeug's default (scrypt) is missing from some Pythons, e.g. the one
+# that comes with Xcode on macOS, so adduser crashed there. PBKDF2 works on every Python.
+PASSWORD_METHOD = "pbkdf2:sha256"
+
 MAX_FAILS = 5          # wrong attempts allowed ...
 LOCK_SECONDS = 60      # ... before that address is blocked for this long
 

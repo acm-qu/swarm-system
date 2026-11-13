@@ -490,6 +490,8 @@ the other by its 100.x address. That's the whole idea.
 | WebSocket | A connection that stays open so both sides can send messages any time | Live status pushed instantly; drive commands without delay. `/robot` for robots, `/ui` for the app |
 | Polling | Asking "anything new?" over and over | What the current page does every second; the WebSocket replaces it |
 | MJPEG | Video sent as a stream of JPEG pictures | The simplest way to show a camera in a web page (an `<img>` tag) |
+| Hash route | The part of the address after `#` (`/#/robot/clanker/arm`), read by the page itself | One page shows Fleet or a robot without reloading, so driving and the camera aren't interrupted, and Back still works |
+| SVG sprite | Many icons kept in one SVG file, each drawn with `<use href="#name">` | All the app's icons in one place (`hub/templates/icons.svg`), inlined so they still show when the hub can't be reached |
 | React | A JavaScript library for building interactive pages from components | The new app |
 | TypeScript | JavaScript with types, so mistakes show up while you type | Safer code when several people edit it |
 | Vite | A tool that runs the app while you develop and builds the final files | Fast dev server; builds what the hub serves |
