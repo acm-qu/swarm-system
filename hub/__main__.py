@@ -34,7 +34,7 @@ def add_user(name):
     if getpass.getpass("Repeat password: ") != password:
         sys.exit("Passwords do not match.")
     users = storage.load_users()
-    users[name] = generate_password_hash(password)
+    users[name] = generate_password_hash(password, method=config.PASSWORD_METHOD)
     storage.save_users(users)
     print(f"Saved user '{name}'.")
 

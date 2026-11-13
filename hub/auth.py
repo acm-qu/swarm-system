@@ -13,7 +13,7 @@ bp = Blueprint("auth", __name__)
 
 fails = {}  # key -> (count, time of last failure)
 fails_lock = threading.Lock()
-DUMMY_HASH = generate_password_hash("not-a-real-password")
+DUMMY_HASH = generate_password_hash("not-a-real-password", method=config.PASSWORD_METHOD)
 
 
 def csrf_token():
