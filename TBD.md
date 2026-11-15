@@ -92,9 +92,9 @@ Where the app differs from the mockups on purpose:
 | Sign-in has two fields | A third field, **Hub address**, remembered on the phone | A phone app has to be told where the hub is |
 | "Every command is logged" (Terminal) | Left out | Not true until History exists |
 
-Not checked on real hardware yet: the app has only run in the iOS simulator against a local hub with a
-simulated robot. Before driving a real robot with it, check on a phone that letting go of a stick stops the
-robot, and that Stop works while a thumb is still on a stick.
+Not checked on a real robot yet: the app has been tried on a phone and in the iOS simulator, against a
+local hub with a simulated robot. Before driving a real robot with it, check that letting go of a stick
+stops the robot, and that Stop works while a thumb is still on a stick.
 
 ## Light mode
 
