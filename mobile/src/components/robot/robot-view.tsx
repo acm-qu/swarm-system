@@ -2,7 +2,7 @@
 // open tab straight underneath, so the camera stays in view while you drive.
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { AppState, Pressable, ScrollView, View } from 'react-native';
 
 import { robotPost } from '@/lib/api';
 import { useHub } from '@/lib/hub';
@@ -54,8 +54,16 @@ export function RobotView({ name, tab, onTab }: { name: string; tab: TabKey; onT
   useEffect(() => {
     if (!known) return;
     robotPost(name, 'ping').catch(() => {}); // a fresh latency for the top bar
+    const release = () => {
+      robotPost(name, 'release_control').catch(() => {}); // let a teammate take over right away
+    };
+    // Putting the app in the background counts as leaving the robot.
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') release();
+    });
     return () => {
-      robotPost(name, 'release_control').catch(() => {}); // leaving: let a teammate take over right away
+      sub.remove();
+      release();
     };
   }, [name, known]);
 
@@ -71,20 +79,22 @@ export function RobotView({ name, tab, onTab }: { name: string; tab: TabKey; onT
     );
   }
 
+  function askTerminal() {
+    hub.openSheet(
+      <ConfirmSheet
+        title={`Open the terminal on ${name}?`} icon={Terminal} confirmLabel="Open terminal"
+        text="This runs commands directly on the robot."
+        note={<Note kind="info">Commands run as the robot&apos;s user, one at a time, and stop after 30 seconds. You won&apos;t be asked again until you sign in next time.</Note>}
+        onConfirm={() => { hub.allowTerminal(); hub.closeSheet(); }}
+      />,
+      () => onTab('drive'), // closed without agreeing: back to Drive
+    );
+  }
+
   function select(next: TabKey) {
     setBigCamera(false);
     onTab(next);
-    if (next === 'terminal' && robot.installed && !hub.terminalOk) {
-      hub.openSheet(
-        <ConfirmSheet
-          title={`Open the terminal on ${name}?`} icon={Terminal} confirmLabel="Open terminal"
-          text="This runs commands directly on the robot."
-          note={<Note kind="info">Commands run as the robot&apos;s user, one at a time, and stop after 30 seconds. You won&apos;t be asked again until you sign in next time.</Note>}
-          onConfirm={() => { hub.allowTerminal(); hub.closeSheet(); }}
-        />,
-        () => onTab('drive'), // closed without agreeing: back to Drive
-      );
-    }
+    if (next === 'terminal' && robot.installed && !hub.terminalOk) askTerminal();
   }
 
   const locked = !!robot.controlled_by && robot.controlled_by !== me;
@@ -140,7 +150,7 @@ export function RobotView({ name, tab, onTab }: { name: string; tab: TabKey; onT
       {tab === 'drive' ? <DriveCard robot={robot} onSteering={setSteering} /> : null}
       {tab === 'arm' ? <ArmCard robot={robot} /> : null}
       {tab === 'sensors' ? <SensorsPanel robot={robot} track={track} now={hub.lastOk} /> : null}
-      {tab === 'terminal' ? <TerminalCard robot={robot} term={term} onTerm={setTerm} /> : null}
+      {tab === 'terminal' ? <TerminalCard robot={robot} term={term} onTerm={setTerm} onAsk={askTerminal} /> : null}
       {tab === 'info' ? <InfoCard robot={robot} /> : null}
     </ScrollView>
   );

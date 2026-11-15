@@ -18,7 +18,9 @@ export const NEW_TERM: Term = { cwd: '', entries: [] };
 
 type ExecResult = { output: string; cwd?: string; code?: number; timed_out?: boolean; limit?: number; truncated?: boolean };
 
-export function TerminalCard({ robot, term, onTerm }: { robot: Robot; term: Term; onTerm: (update: (t: Term) => Term) => void }) {
+export function TerminalCard({
+  robot, term, onTerm, onAsk,
+}: { robot: Robot; term: Term; onTerm: (update: (t: Term) => Term) => void; onAsk: () => void }) {
   const hub = useHub();
   const t = useTheme();
   const [command, setCommand] = useState('');
@@ -72,6 +74,12 @@ export function TerminalCard({ robot, term, onTerm }: { robot: Robot; term: Term
           </View>
         )) : <Txt size={12} mono tone="text3">Nothing run yet.</Txt>}
       </ScrollView>
+      {/* Arrived here without agreeing (e.g. switched robots while on this tab): ask before anything can run. */}
+      {hub.terminalOk ? null : (
+        <View style={{ paddingTop: 10, paddingHorizontal: 12 }}>
+          <Btn label="Open terminal…" icon={TerminalIcon} kind="dangerSoft" onPress={onAsk} />
+        </View>
+      )}
       <Row gap={8} style={{ paddingVertical: 10, paddingHorizontal: 12, borderTopWidth: 1, borderTopColor: t.border }}>
         <Row gap={8} style={{
           flex: 1, height: 42, borderWidth: 1, borderColor: t.borderStrong, borderRadius: 10, backgroundColor: t.surfaceDeep, paddingHorizontal: 10,

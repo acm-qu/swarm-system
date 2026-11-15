@@ -2,7 +2,7 @@
 // right one turns it. While a stick is off-centre the app sends a drive command about 10 times a
 // second; the robot stops by itself if they stop arriving, so a dropped link or a closed app is safe.
 import Slider from '@react-native-community/slider';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, View } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 
@@ -18,30 +18,43 @@ const SEND_MS = 100;
 const STICK = 132; // points across
 const KNOB = 54;
 
-// `stamp` is the hub's stopCount when the thumb went down. After any Stop the count moves on, so a
-// thumb that is still down counts as centred until it is lifted and put down again.
-type Held = Stick & { stamp: number; touching: boolean };
-const LET_GO: Held = { ...CENTER, stamp: -1, touching: false };
+// `locked`: a Stop was pressed while this thumb was down. The stick then counts as centred until
+// the thumb is lifted and put down again, so the robot can't start moving again by itself.
+type Held = Stick & { touching: boolean; locked: boolean };
+type Phase = 'down' | 'drag' | 'up';
+const LET_GO: Held = { ...CENTER, touching: false, locked: false };
+const lockIfHeld = (held: Held): Held => (held.touching ? { ...held, locked: true } : held);
+const afterTouch = (stick: Stick, phase: Phase) => (held: Held): Held =>
+  ({ ...stick, touching: phase !== 'up', locked: phase === 'down' ? false : held.locked });
 
 function ThumbStick({
   kind, label, value, active, disabled, onChange,
 }: {
   kind: 'move' | 'turn'; label: string; value: Stick; active: boolean; disabled: boolean;
-  onChange: (stick: Stick, phase: 'down' | 'drag' | 'up') => void;
+  onChange: (stick: Stick, phase: Phase) => void;
 }) {
   const t = useTheme();
   const turn = kind === 'turn';
   const height = turn ? KNOB + 14 : STICK;
-  // The turn stick only reads left/right, so its touch is always taken as vertically centred.
-  const read = (x: number, y: number) => stickFromTouch(x, turn ? STICK / 2 : y, STICK);
-  const pan = usePanGesture({
-    enabled: !disabled,
-    minDistance: 0,
-    runOnJS: true,
-    onBegin: (e) => onChange(read(e.x, e.y), 'down'),
-    onUpdate: (e) => onChange(read(e.x, e.y), 'drag'),
-    onFinalize: () => onChange(CENTER, 'up'),
+  // The gesture is set up once (a new set-up on every redraw would be re-sent to the phone's touch
+  // system while a thumb is down), so it reaches the newest onChange through this ref.
+  const latest = useRef(onChange);
+  useEffect(() => {
+    latest.current = onChange;
   });
+  const config = useMemo(() => {
+    // The turn stick only reads left/right, so its touch is always taken as vertically centred.
+    const read = (x: number, y: number) => stickFromTouch(x, turn ? STICK / 2 : y, STICK);
+    return {
+      enabled: !disabled,
+      minDistance: 0,
+      runOnJS: true,
+      onBegin: (e: { x: number; y: number }) => latest.current(read(e.x, e.y), 'down'),
+      onUpdate: (e: { x: number; y: number }) => latest.current(read(e.x, e.y), 'drag'),
+      onFinalize: () => latest.current(CENTER, 'up'),
+    };
+  }, [disabled, turn]);
+  const pan = usePanGesture(config);
   const reach = (STICK - KNOB) / 2;
   const line = { position: 'absolute', backgroundColor: t.border } as const;
   return (
@@ -96,15 +109,22 @@ export function DriveCard({ robot, onSteering }: { robot: Robot; onSteering: (st
   const [speed, setSpeed] = useState(40);
   const [error, setError] = useState('');
 
-  const current = (held: Held): Stick => (ok && held.stamp === hub.stopCount ? held : CENTER);
+  // Any Stop (this robot's, Stop all, the switcher's) locks the sticks that are being held right now.
+  const [stopsSeen, setStopsSeen] = useState(hub.stopCount);
+  if (hub.stopCount !== stopsSeen) {
+    setStopsSeen(hub.stopCount);
+    setMove(lockIfHeld);
+    setTurn(lockIfHeld);
+  }
+
+  const current = (held: Held): Stick => (ok && !held.locked ? held : CENTER);
   const command = driveCommand(current(move), current(turn), speed);
 
-  function change(which: 'move' | 'turn', stick: Stick, phase: 'down' | 'drag' | 'up') {
-    const other = which === 'move' ? turn : move;
-    const set = which === 'move' ? setMove : setTurn;
-    set((held) => ({ ...stick, touching: phase !== 'up', stamp: phase === 'down' ? hub.stopCount : held.stamp }));
-    onSteering(phase !== 'up' || other.touching); // the page must not scroll under a thumb that is steering
-  }
+  // The page must not scroll under a thumb that is steering.
+  const steering = move.touching || turn.touching;
+  useEffect(() => {
+    onSteering(steering);
+  }, [steering, onSteering]);
 
   // The newest command, for the sender below (which must not restart every time a stick moves).
   const latest = useRef(command);
@@ -170,10 +190,10 @@ export function DriveCard({ robot, onSteering }: { robot: Robot; onSteering: (st
           ) : null}
         </Row>
         <Row style={{ justifyContent: 'space-around', marginTop: 14 }}>
-          <ThumbStick kind="move" label="Move" value={current(move)} active={ok && move.touching && move.stamp === hub.stopCount}
-            disabled={!ok} onChange={(stick, phase) => change('move', stick, phase)} />
-          <ThumbStick kind="turn" label="Turn" value={current(turn)} active={ok && turn.touching && turn.stamp === hub.stopCount}
-            disabled={!ok} onChange={(stick, phase) => change('turn', stick, phase)} />
+          <ThumbStick kind="move" label="Move" value={current(move)} active={ok && move.touching && !move.locked}
+            disabled={!ok} onChange={(stick, phase) => setMove(afterTouch(stick, phase))} />
+          <ThumbStick kind="turn" label="Turn" value={current(turn)} active={ok && turn.touching && !turn.locked}
+            disabled={!ok} onChange={(stick, phase) => setTurn(afterTouch(stick, phase))} />
         </Row>
         {ok ? (
           <>
