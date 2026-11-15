@@ -40,7 +40,7 @@ export function TopBar() {
   const t = useTheme();
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
-  const { name } = useGlobalSearchParams<{ name?: string }>();
+  const { name, tab } = useGlobalSearchParams<{ name?: string; tab?: string }>();
   const [stopLabel, setStopLabel] = useState('Stop all');
   const labelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -67,7 +67,7 @@ export function TopBar() {
           {onRobot ? (
             <Pressable
               accessibilityRole="button" accessibilityLabel={`${name}. Switch robot`} hitSlop={6}
-              onPress={() => hub.openSheet(<SwitcherSheet current={name} />)}
+              onPress={() => hub.openSheet(<SwitcherSheet current={name} tab={tab} />)}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Txt size={17} weight="600" numberOfLines={1} style={{ flexShrink: 1 }}>{name}</Txt>
               <ChevronDown size={16} color={t.text2} />

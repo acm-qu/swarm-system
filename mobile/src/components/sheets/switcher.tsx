@@ -8,14 +8,14 @@ import { useTheme } from '@/theme';
 import { Sheet } from '../sheet';
 import { CtrlPill, Monogram, Row, StatusPill, StopBtn, Txt } from '../ui';
 
-export function SwitcherSheet({ current }: { current: string }) {
+export function SwitcherSheet({ current, tab }: { current: string; tab?: string }) {
   const hub = useHub();
   const t = useTheme();
   const online = hub.robots.filter((r) => r.status === 'connected').length;
 
   function open(name: string) {
     hub.closeSheet();
-    router.navigate({ pathname: '/robot/[name]', params: { name } });
+    router.navigate({ pathname: '/robot/[name]', params: tab ? { name, tab } : { name } }); // stay on the same tab
   }
 
   return (

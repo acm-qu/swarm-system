@@ -31,6 +31,8 @@ const TABS: { key: TabKey; label: string; icon: LucideIcon; locks?: boolean; cam
   { key: 'info', label: 'Info', icon: Info },
 ];
 
+export const isTab = (value: unknown): value is TabKey => TABS.some((tab) => tab.key === value);
+
 export function RobotView({ name, tab, onTab }: { name: string; tab: TabKey; onTab: (tab: TabKey) => void }) {
   const hub = useHub();
   const t = useTheme();
