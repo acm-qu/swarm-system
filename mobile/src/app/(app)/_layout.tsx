@@ -18,7 +18,7 @@ export default function AppLayout() {
           <Tabs.Screen name="index" />
           <Tabs.Screen name="history" />
           <Tabs.Screen name="health" />
-          <Tabs.Screen name="help" />
+          <Tabs.Screen name="settings" />
           <Tabs.Screen name="robot/[name]" />
         </Tabs>
         <SheetHost />

@@ -12,7 +12,7 @@ import { ChevronDown, ChevronLeft, TriangleAlert } from './icons';
 import { SwitcherSheet } from './sheets/switcher';
 import { Logo, Row, StopBtn, Txt } from './ui';
 
-const TITLES: Record<string, string> = { '/': 'Fleet', '/history': 'History', '/health': 'Health', '/help': 'Help' };
+const TITLES: Record<string, string> = { '/': 'Fleet', '/history': 'History', '/health': 'Health', '/settings': 'Settings' };
 
 function HubLine() {
   const hub = useHub();

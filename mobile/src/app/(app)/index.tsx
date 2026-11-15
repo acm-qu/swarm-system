@@ -2,9 +2,9 @@
 import { router } from 'expo-router';
 import { ScrollView, View } from 'react-native';
 
-import { Bot, Clock, Hash, KeyRound, LogOut, Plus, Radio, RefreshCw, Wifi } from '@/components/icons';
+import { Bot, Clock, Hash, KeyRound, Plus, Radio, RefreshCw, Wifi } from '@/components/icons';
 import { RobotFormSheet } from '@/components/sheets/robot-form';
-import { Avatar, Btn, Card, CtrlPill, Grow, Monogram, Note, Row, StatusPill, StopBtn, Txt } from '@/components/ui';
+import { Btn, Card, CtrlPill, Grow, Monogram, Note, Row, StatusPill, StopBtn, Txt } from '@/components/ui';
 import { useHub } from '@/lib/hub';
 import { ago, distText, live, ms, type Robot } from '@/lib/robot';
 import { useTheme } from '@/theme';
@@ -115,17 +115,6 @@ export default function Fleet() {
       {!hub.loaded ? <Txt tone="text2">{hub.ok ? 'Loading robots…' : 'Waiting for the hub…'}</Txt>
         : count ? hub.robots.map((r) => <FleetCard key={r.name} robot={r} staleSeconds={staleSeconds} />)
         : <EmptyFleet onAdd={add} />}
-
-      <Card style={{ padding: 12 }}>
-        <Row gap={10}>
-          <Avatar name={hub.user || ''} size={30} />
-          <View style={{ flex: 1 }}>
-            <Txt size={13.5} weight="500" numberOfLines={1}>Signed in as {hub.user}</Txt>
-            <Txt size={12} tone="text2" mono numberOfLines={1}>{hub.address}</Txt>
-          </View>
-          <Btn label="Sign out" icon={LogOut} size="sm" onPress={hub.signOut} />
-        </Row>
-      </Card>
     </ScrollView>
   );
 }

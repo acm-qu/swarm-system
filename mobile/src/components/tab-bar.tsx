@@ -1,17 +1,18 @@
-// The four pages along the bottom. A robot's page belongs to Fleet.
+// The four pages along the bottom. A robot's page belongs to Fleet. The mockups have Help as the
+// fourth page; the app has Settings there instead (who is signed in, the hub, Sign out).
 import { router, usePathname } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '@/theme';
-import { Activity, CircleHelp, History, LayoutGrid, type LucideIcon } from './icons';
+import { Activity, History, LayoutGrid, Settings, type LucideIcon } from './icons';
 import { Txt } from './ui';
 
-const TABS: { href: '/' | '/history' | '/health' | '/help'; label: string; icon: LucideIcon }[] = [
+const TABS: { href: '/' | '/history' | '/health' | '/settings'; label: string; icon: LucideIcon }[] = [
   { href: '/', label: 'Fleet', icon: LayoutGrid },
   { href: '/history', label: 'History', icon: History },
   { href: '/health', label: 'Health', icon: Activity },
-  { href: '/help', label: 'Help', icon: CircleHelp },
+  { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
 export function TabBar() {
