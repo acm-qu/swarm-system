@@ -75,29 +75,65 @@ def classic():
     return page(template="index.html")
 
 
-@bp.post("/login")
-def login():
+def sign_in(name, password):
+    """Check a login and start the session. Returns None, or (message, status) to show the person."""
     ip = request.remote_addr
-    if not csrf_ok(request.form.get("csrf", "")):
-        return page("Session expired, try again.", 400)
     if blocked(ip):
-        return page("Too many attempts. Wait a minute.", 429)
-
-    name = request.form.get("username", "").strip()
-    password = request.form.get("password", "")
+        return "Too many attempts. Wait a minute.", 429
     stored = storage.load_users().get(name)
     # Check a hash even for unknown users so both cases take similar time.
     ok = check_password_hash(stored or DUMMY_HASH, password) and stored is not None
-
     if not ok:
         record_fail(ip)
-        return page("Wrong username or password.", 401)
-
+        return "Wrong username or password.", 401
     clear_fails(ip)
     session.clear()           # new session after login
     session["user"] = name
     csrf_token()
+    return None
+
+
+@bp.post("/login")
+def login():
+    if not csrf_ok(request.form.get("csrf", "")):
+        return page("Session expired, try again.", 400)
+    problem = sign_in(request.form.get("username", "").strip(), request.form.get("password", ""))
+    if problem:
+        return page(*problem)
     return redirect(url_for("auth.home"))
+
+
+# ---- the same sign-in as JSON, for the phone app (mobile/), which has no HTML form to read a token from
+
+def session_json():
+    return jsonify(user=session.get("user"), csrf=csrf_token())
+
+
+@bp.get("/api/session")
+def session_info():
+    """Who is signed in (user is null if nobody), and the CSRF token to send with every POST."""
+    return session_json()
+
+
+@bp.post("/api/session")
+def session_login():
+    # Only JSON is accepted: a form on another website can't send it, which is what the form's
+    # CSRF token guards against.
+    data = request.get_json(silent=True) if request.is_json else None
+    if not isinstance(data, dict):
+        return jsonify(error="Send the username and password as JSON."), 400
+    problem = sign_in(str(data.get("username", "")).strip(), str(data.get("password", "")))
+    if problem:
+        return jsonify(error=problem[0]), problem[1]
+    return session_json()
+
+
+@bp.delete("/api/session")
+def session_logout():
+    if not csrf_ok(request.headers.get("X-CSRF", "")):
+        return jsonify(error="bad csrf token"), 400
+    session.clear()
+    return jsonify(ok=True)
 
 
 @bp.post("/logout")
