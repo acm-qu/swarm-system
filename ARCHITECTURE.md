@@ -46,6 +46,9 @@ The app is a **React front end on top of the existing hub**. The hub keeps doing
 
 ## 2. System overview
 
+How it works **today** (before the changes this document plans), as a diagram you can open in draw.io:
+`docs/architecture.drawio`. Page 1 is control from a laptop, page 2 is control from the phone app.
+
 ```
  Teammate laptop (anywhere)                       Lab (one Wi-Fi network)
  ┌────────────────────────┐   Tailscale (encrypted) ┌───────────────────────────────────────┐
