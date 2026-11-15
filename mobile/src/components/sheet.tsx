@@ -1,7 +1,7 @@
 // Bottom sheets (the phone's version of dialogs) and the toast. The dimmed area starts under the
 // top bar, so Stop all stays in reach while a sheet is open.
 import { useEffect, type ReactNode } from 'react';
-import { BackHandler, KeyboardAvoidingView, Platform, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
+import { BackHandler, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useHub } from '@/lib/hub';
@@ -28,15 +28,13 @@ export function SheetHost() {
 
   if (!open) return null;
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'flex-end' }}>
+    <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, justifyContent: 'flex-end' }}>
       <Pressable
         accessibilityLabel="Close" accessibilityRole="button" onPress={dismiss}
         style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: t.overlay }}
       />
       {hub.sheet}
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -49,14 +47,13 @@ export function Sheet({
   const hub = useHub();
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const { height } = useWindowDimensions();
   return (
     <View
       accessibilityViewIsModal
       style={{
         backgroundColor: t.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22, borderWidth: 1, borderBottomWidth: 0,
         borderColor: t.borderStrong, borderTopColor: danger ? t.stop : t.borderStrong, borderTopWidth: danger ? 3 : 1,
-        maxHeight: height * 0.78,
+        maxHeight: '94%', // of the space under the top bar, which shrinks when the keyboard opens
       }}>
       <View style={{ alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: t.borderStrong, marginTop: 8 }} />
       <Row gap={14} align="flex-start" style={{ paddingHorizontal: 18, paddingTop: 13 }}>
@@ -79,7 +76,7 @@ export function Sheet({
       </Row>
       <ScrollView
         keyboardShouldPersistTaps="handled"
-        style={{ flexGrow: 0 }}
+        style={{ flexGrow: 0, flexShrink: 1 }}
         contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 14, paddingBottom: 16, gap: 14 }}>
         {children}
       </ScrollView>

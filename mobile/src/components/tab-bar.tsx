@@ -4,6 +4,7 @@ import { router, usePathname } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useKeyboardOpen } from '@/lib/keyboard';
 import { useTheme } from '@/theme';
 import { Activity, History, LayoutGrid, Settings, type LucideIcon } from './icons';
 import { Txt } from './ui';
@@ -20,6 +21,8 @@ export function TabBar() {
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const active = TABS.some((tab) => tab.href === pathname) ? pathname : '/';
+  const typing = useKeyboardOpen();
+  if (typing) return null; // the space above the keyboard is for what you are typing into
   return (
     <View
       accessibilityRole="tablist"
