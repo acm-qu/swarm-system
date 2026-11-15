@@ -67,6 +67,35 @@ hub should stay pip-only until then. The old page still works at `/classic` unti
 | Bottom tab bar (Fleet, History, Health, Help) | 32, 33 | The other pages. On a phone, the sidebar becomes a top strip with Fleet and Sign out |
 | Compact drive pad in one row | 33 | Layout only. The phone shows the full pad, which works |
 
+## Phone app (`mobile/`)
+
+The React Native app follows the phone mockups (`design/html/phone-NN-*.html`), again only for what the hub
+can do today. Everything in the tables above that says "needs S3" is missing from the phone app too.
+
+| Feature | Phone screens | In the app today |
+|---|---|---|
+| History, Health | 18, 19 | Tabs that say "Soon" |
+| Help and its articles | 20, 21 | Not there. The fourth tab is **Settings** instead (who is signed in, the hub's address, Sign out), which the mockups don't have |
+| Robot → Activity tab | 17 | Left out |
+| **Take control** button | 08 | Your first stick or slider move takes control, and the Drive card says so |
+| Camera quality switch, "Live · 15 fps" | 06 | Always about 5 pictures a second (`/snapshot`) |
+| "Moving" pill, event toasts ("sara took control of Rover") | 03, 06 | Left out. The only toast is an error about your own action |
+| Compact camera thumbnail per Fleet card | 03 | No picture on Fleet |
+
+Where the app differs from the mockups on purpose:
+
+| Mockup | App | Why |
+|---|---|---|
+| Six hold-to-move buttons (Q W E A S D) | Two thumb sticks: **Move** (forward/back, slide) and **Turn** | Speed follows how far you push, and both thumbs work at once |
+| "Speed 40%" as text | The same text plus a 10-100% slider | The web page has one |
+| No Ping button | **Ping** on each Fleet card, and one ping when you open a robot | Latency is only measured by a ping |
+| Sign-in has two fields | A third field, **Hub address**, remembered on the phone | A phone app has to be told where the hub is |
+| "Every command is logged" (Terminal) | Left out | Not true until History exists |
+
+Not checked on real hardware yet: the app has only run in the iOS simulator against a local hub with a
+simulated robot. Before driving a real robot with it, check on a phone that letting go of a stick stops the
+robot, and that Stop works while a thumb is still on a stick.
+
 ## Light mode
 
 Light mode follows the computer's setting (`prefers-color-scheme`). There is no switch in the app yet.

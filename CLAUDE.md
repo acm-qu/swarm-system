@@ -11,6 +11,10 @@ A swarm of Raspberry Pi robots (rewired Hiwonder MasterPi chassis) controlled by
   Raspberry Pi 5 in the lab with a React front end in `web/`; local hubs stay for development.
   The page at `/` is `hub/templates/app.html` + `hub/static/app.js` + `app.css`, built from the mockups in
   `design/html/`; what they show that isn't built yet is in `TBD.md`. The old page stays at `/classic` until S6.
+- `mobile/`: the phone app (React Native + Expo, TypeScript), built from the phone mockups
+  (`design/html/phone-*.html`). It uses the same REST API as the web page, plus `/api/session` (sign in as
+  JSON) and `/api/robots/<name>/snapshot` (one camera picture). Run it with `npm start` in `mobile/` and
+  the Expo Go app on a phone; see `mobile/README.md`. What it doesn't do yet is in `TBD.md`.
 - `robot/`: runs on each robot. The hub copies these files into `~/swarm-agent/` on the robot and runs
   `robot_agent.py` as the `swarm-agent` systemd service. Robots never pull code themselves. Edit here,
   then press **Update** in the hub.
@@ -46,6 +50,9 @@ once per robot on **Add robot**, and on **Update** only if the script has change
   (`robots.clean_capabilities`) and the page enables buttons from it (`hub/static/app.js`).
 - A new sensor: add it to `robot/sensors.py` (`setup`, `names`, `read`). Readings travel in each heartbeat
   and appear on the robot's Sensors tab (under Other readings until it gets its own panel).
+- The phone app keeps the same safety rules as the web page: Stop and Stop all never need control and stay
+  above every sheet, drive commands repeat only while a stick is held, and leaving a robot or putting the
+  app in the background lets go and releases control. Keep these when changing `mobile/`.
 - Match the existing style: plain-language error messages meant for students, short comments that say why.
 - Each robot has its own token (in `data/robots.json`, written to its `config.json` on Add/Update). The
   shared token in `robot_token.txt` still works for robots not updated yet and for test agents.
@@ -74,7 +81,9 @@ Hub → robot: `welcome`, `refused`, `heartbeat_ack {swarm, camera}`, `ping`, `s
 
 ## Testing
 
-There's no test suite yet. To check a change without hardware, run the hub with `SWARM_DATA_DIR` pointing
+The hub and robot have no test suite yet; the phone app has one (`npm test`, `npm run lint` and
+`npm run typecheck` in `mobile/`, run by GitHub Actions on every pull request that touches it).
+To check a change without hardware, run the hub with `SWARM_DATA_DIR` pointing
 at a temp folder and `PORT=8765`. Then copy `robot/*.py` to a temp folder with a `config.json`
 (`{"hub": ["127.0.0.1:8765"], "name": "test-bot", "token": "<python -m hub token>"}`) and run
 `python robot_agent.py` there. It connects with all hardware disabled.

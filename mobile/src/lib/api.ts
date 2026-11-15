@@ -76,6 +76,8 @@ export const robotPost = <T = any>(name: string, action: string, data?: unknown,
 
 export type Snapshot = { state: 'frame'; uri: string; id: string } | { state: 'waiting' } | { state: 'offline' };
 
+// shortcut: each picture is copied through React Native's Blob store, fine for small 5 fps frames;
+// switch to expo-blob (or the /ui WebSocket, ARCHITECTURE.md S3) if pictures get big or faster.
 function toDataUri(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
