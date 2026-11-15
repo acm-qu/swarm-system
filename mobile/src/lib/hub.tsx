@@ -3,7 +3,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 
-import { configure, get, HubError, normalizeHubAddress, post, request, robotPost } from './api';
+import { configure, get, HubError, normalizeHubAddress, post, robotPost } from './api';
 import { live, type Robot } from './robot';
 
 const ADDRESS_KEY = 'hub-address'; // only the address is remembered on the phone, never a password
@@ -75,7 +75,7 @@ export function HubProvider({ children }: { children: ReactNode }) {
       if (address) {
         configure({ base: normalizeHubAddress(address) });
         try {
-          const s = await get<{ user: string | null; csrf: string }>('/api/session');
+          const s = await get<{ user: string | null; csrf: string }>('/auth/session');
           configure({ csrf: s.csrf });
           user = s.user;
         } catch {
@@ -124,7 +124,7 @@ export function HubProvider({ children }: { children: ReactNode }) {
     if (!base) throw new Error("Enter the hub's address, for example 192.168.1.20:8000.");
     configure({ base });
     try {
-      const s = await post<{ user: string; csrf: string }>('/api/session', { username: username.trim(), password });
+      const s = await post<{ user: string; csrf: string }>('/auth/login', { username: username.trim(), password });
       configure({ csrf: s.csrf });
       AsyncStorage.setItem(ADDRESS_KEY, address.trim()).catch(() => {}); // not remembered: type it again next time
       setSession({ ready: true, user: s.user, address: address.trim() });
@@ -137,7 +137,7 @@ export function HubProvider({ children }: { children: ReactNode }) {
   }
 
   function signOut() {
-    request('DELETE', '/api/session').catch(() => {}); // signed out here even if the hub can't be told
+    post('/auth/logout').catch(() => {}); // signed out here even if the hub can't be told
     endSession();
   }
 

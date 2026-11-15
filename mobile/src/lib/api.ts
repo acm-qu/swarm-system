@@ -1,4 +1,4 @@
-// Talks to the hub's JSON API (hub/api.py and the /api/session routes in hub/auth.py).
+// Talks to the hub's JSON API (hub/api.py and the /auth routes in hub/auth.py).
 // The phone keeps the hub's login cookie by itself; this file adds the CSRF token to every request.
 
 export class HubError extends Error {
@@ -57,7 +57,7 @@ async function send(method: string, path: string, data?: unknown, timeoutMs = TI
 export async function request<T = any>(method: string, path: string, data?: unknown, timeoutMs?: number): Promise<T> {
   const res = await send(method, path, data, timeoutMs);
   // A 401 from the sign-in route itself is a wrong password, not an expired session.
-  if (res.status === 401 && path !== '/api/session') {
+  if (res.status === 401 && path !== '/auth/login') {
     onSignedOut();
     throw new HubError('You were signed out.', 401);
   }

@@ -103,19 +103,20 @@ def login():
     return redirect(url_for("auth.home"))
 
 
-# ---- the same sign-in as JSON, for the phone app (mobile/), which has no HTML form to read a token from
+# ---- the same sign-in as JSON (ARCHITECTURE.md, section 6), for apps with no HTML form to read a token
+# from: the phone app (mobile/) today, the React app later
 
 def session_json():
     return jsonify(user=session.get("user"), csrf=csrf_token())
 
 
-@bp.get("/api/session")
+@bp.get("/auth/session")
 def session_info():
     """Who is signed in (user is null if nobody), and the CSRF token to send with every POST."""
     return session_json()
 
 
-@bp.post("/api/session")
+@bp.post("/auth/login")
 def session_login():
     # Only JSON is accepted: a form on another website can't send it, which is what the form's
     # CSRF token guards against.
@@ -128,7 +129,7 @@ def session_login():
     return session_json()
 
 
-@bp.delete("/api/session")
+@bp.post("/auth/logout")
 def session_logout():
     if not csrf_ok(request.headers.get("X-CSRF", "")):
         return jsonify(error="bad csrf token"), 400

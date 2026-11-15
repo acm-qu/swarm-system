@@ -12,7 +12,7 @@ A swarm of Raspberry Pi robots (rewired Hiwonder MasterPi chassis) controlled by
   The page at `/` is `hub/templates/app.html` + `hub/static/app.js` + `app.css`, built from the mockups in
   `design/html/`; what they show that isn't built yet is in `TBD.md`. The old page stays at `/classic` until S6.
 - `mobile/`: the phone app (React Native + Expo, TypeScript), built from the phone mockups
-  (`design/html/phone-*.html`). It uses the same REST API as the web page, plus `/api/session` (sign in as
+  (`design/html/phone-*.html`). It uses the same REST API as the web page, plus `/auth/login` (sign in as
   JSON) and `/api/robots/<name>/snapshot` (one camera picture). Run it with `npm start` in `mobile/` and
   the Expo Go app on a phone; see `mobile/README.md`. What it doesn't do yet is in `TBD.md`.
 - `robot/`: runs on each robot. The hub copies these files into `~/swarm-agent/` on the robot and runs

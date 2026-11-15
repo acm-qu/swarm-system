@@ -58,7 +58,7 @@ describe('request', () => {
 
   it('treats a 401 from sign-in as a wrong password, not an ended session', async () => {
     fetchMock.mockResolvedValue(reply(401, { error: 'Wrong username or password.' }));
-    await expect(post('/api/session', {})).rejects.toMatchObject({ message: 'Wrong username or password.' });
+    await expect(post('/auth/login', {})).rejects.toMatchObject({ message: 'Wrong username or password.' });
     expect(signedOut).not.toHaveBeenCalled();
   });
 
