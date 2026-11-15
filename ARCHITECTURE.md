@@ -46,6 +46,9 @@ The app is a **React front end on top of the existing hub**. The hub keeps doing
 
 ## 2. System overview
 
+How it works **today** (before the changes this document plans), as a diagram you can open in draw.io:
+`docs/architecture.drawio`. Page 1 is control from a laptop, page 2 is control from the phone app.
+
 ```
  Teammate laptop (anywhere)                       Lab (one Wi-Fi network)
  ┌────────────────────────┐   Tailscale (encrypted) ┌───────────────────────────────────────┐
@@ -90,8 +93,8 @@ so the hub can check who is in control, rate-limit, log, and stop robots when a 
 |---|---|---|
 | `__main__.py` | exists | Command line: `adduser`, `token`, `rotate`, run (`--headless` on the Pi) |
 | `app.py` | exists | Builds the Flask app from the parts below |
-| `auth.py` | exists, extend | Login, CSRF, password-guess blocking. **Add:** JSON session endpoints for the React app |
-| `api.py` | exists, extend | REST API (section 6). **Added:** control checks. **Add:** stop all, history, health, samples |
+| `auth.py` | exists | Login, CSRF, password-guess blocking. **Added:** JSON sign-in at `/auth/session`, `/auth/login`, `/auth/logout` (used by the phone app; the React app will use them too) |
+| `api.py` | exists, extend | REST API (section 6). **Added:** control checks, camera snapshot (one JPEG, for the phone app). **Add:** stop all, history, health, samples |
 | `robots.py` | exists | Live robot link at `/robot`, robot list. **Added:** per-robot token check |
 | `control.py` | **added** | Control lock (one controller per robot, 15 s lease) and command rate limit (25/s, burst 10) |
 | `deploy.py` | exists | SSH Add / Update / Remove / Terminal. **Added:** gives each robot its own token |
@@ -113,6 +116,14 @@ so the hub can check who is in control, rate-limit, log, and stop robots when a 
 | `help/` | The plain-language explanation of every feature, shown in the app |
 
 Styling: Tailwind CSS with Radix-based components (shadcn/ui), following the designer's layouts.
+
+### On a phone (`mobile/`, React Native + Expo)
+
+A native app for iOS and Android, built from the phone mockups in `design/html/phone-*.html`. It is a
+second front end on the same hub: it signs in through `/auth/login`, asks `/api/robots` once a second
+like the web page, and shows the camera by asking `/api/robots/<name>/snapshot` about five times a second
+(a phone app can't show the MJPEG stream in a picture). Driving uses two thumb sticks instead of keys. It
+can switch to the `/ui` WebSocket when that exists (S3). What it leaves out is listed in `TBD.md`.
 
 ### On the robots (`robot/`)
 
@@ -236,9 +247,9 @@ interface HistoryEvent {
 
 | Method & path | Body | Returns | Status |
 |---|---|---|---|
-| `GET /auth/session` | | `{user: string \| null, csrf}` | new |
-| `POST /auth/login` | `{username, password}` | `{user}` or 401/429 | new (JSON version of the form) |
-| `POST /auth/logout` | | `{ok}` | new |
+| `GET /auth/session` | | `{user: string \| null, csrf}` | **added** |
+| `POST /auth/login` | `{username, password}` | `{user, csrf}` or 401/429 | **added** (JSON version of the form; the session is new after sign-in, so it returns the new `csrf`) |
+| `POST /auth/logout` | | `{ok}` | **added** |
 | `GET /api/robots` | | `RobotRow[]` | exists |
 | `POST /api/robots` | `{host, user, password, name?, reboot?}` | `{job}` | exists |
 | `GET /api/jobs/<id>` | | `Job` | exists |
@@ -246,6 +257,7 @@ interface HistoryEvent {
 | `POST /api/robots/<n>/remove` | `{password?, forget?}` | `{job}` / 409 busy | exists |
 | `POST /api/robots/<n>/exec` | `{command, cwd}` | `{output, code, cwd, timed_out, truncated, limit}` | exists |
 | `GET /api/robots/<n>/camera?fps=` | | MJPEG stream | exists; `fps` new |
+| `GET /api/robots/<n>/snapshot` | | one JPEG (`X-Frame-Id` header), 204 while the camera starts, 409 offline | **added** (for the phone app) |
 | `POST /api/robots/<n>/drive` | `{forward, strafe, rotate}` (-1..1) | `{ok}` / 409 control / 429 | exists, control added |
 | `POST /api/robots/<n>/arm` | `{targets: {joint: µs}}` | `{ok}` / 409 / 429 | exists, control added |
 | `POST /api/robots/<n>/arm_release` | | `{ok}` / 409 / 429 | exists, control added |
@@ -355,10 +367,15 @@ swarm-system/
 │   ├── src/screens/           SignIn, Fleet, Robot, History, Health, Help
 │   ├── src/components/        StatusPill, RobotCard, DrivePad, ArmPanel, CameraView, ...
 │   └── src/help/              feature explanations shown in the app
+├── mobile/                    phone app: React Native + Expo + TypeScript   (added)
+│   ├── src/app/               screens (Expo Router): sign-in, Fleet, robot, History, Health, Settings
+│   ├── src/components/        ui.tsx, top bar, tab bar, sheets, robot/ (camera, drive, arm, ...)
+│   └── src/lib/               api.ts, hub.tsx, robot.ts, drive.ts, sensors.ts + tests
 ├── robot/                     runs on each robot (unchanged)
 ├── tools/sim_robot.py         simulated robot for development       (new)
 ├── infra/                     swarm-hub.service, tailscale-acl.hujson, lab-network.md   (new)
 ├── .github/workflows/ci.yml   checks, simulated-robot test, web build                    (new)
+├── .github/workflows/mobile.yml   lint, type check and tests for mobile/              (added)
 ├── docs/UI_SPEC.md            screens and features, for the designer
 └── data/                      secrets + history (gitignored, never committed)
 ```
@@ -501,6 +518,19 @@ the other by its 100.x address. That's the whole idea.
 | Session cookie | A small signed note the browser keeps after you sign in | How the hub knows who you are on each request |
 | CSRF | An attack where another website makes your browser send requests to ours | Blocked by a secret header on every POST (already built) |
 | Origin check | Checking which website opened a WebSocket | Stops other sites from using your signed-in session on `/ui` |
+
+### Phone app
+
+| Term | What it is | Why we use it |
+|---|---|---|
+| React Native | React, but the components become real iOS and Android buttons and views instead of a web page | One code base (TypeScript) for both kinds of phone |
+| Expo | A set of tools and ready-made modules around React Native | Starts a project in one command and handles icons, fonts and builds, so we don't need Xcode or Android Studio to develop |
+| Expo Go | A free app from the App Store / Play Store that runs our app from a QR code | Try a change on a real phone in seconds, with nothing to install on the computer except Node |
+| Expo Router | Navigation where each file in `mobile/src/app/` is a screen | Adding a screen is adding a file |
+| Metro | The program `npm start` runs: it bundles the app's code and sends it to the phone | Changes show up on the phone as you save |
+| Development build | Our own installable version of the app, instead of running inside Expo Go | Only needed if we add a native module Expo Go doesn't include |
+| Bottom sheet | A panel that slides up from the bottom of the screen | The phone's version of a dialog; ours starts below the top bar so Stop all stays reachable |
+| Snapshot | One camera picture (JPEG) per request | How the phone shows the camera until the `/ui` WebSocket exists |
 
 ### Data and build
 

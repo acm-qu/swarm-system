@@ -92,6 +92,19 @@ def camera(name):
                     headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
 
 
+@bp.get("/robots/<name>/snapshot")
+def snapshot(name):
+    """The camera's newest picture as one JPEG, for apps that can't show the MJPEG stream (the phone
+    app asks a few times a second). Asking is what keeps the robot's camera on."""
+    rec = robots.get_online(name)
+    if rec is None:
+        return jsonify(error="robot is offline"), 409
+    rec["cam_wanted"] = time.time()
+    if rec["frame"] is None:
+        return "", 204                 # camera still starting: ask again
+    return Response(rec["frame"], mimetype="image/jpeg", headers={"X-Frame-Id": str(rec["frame_id"])})
+
+
 # ---- installing: update / remove / terminal (over SSH)
 
 def registry_entry(name):
